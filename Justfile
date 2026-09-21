@@ -29,6 +29,29 @@ lint:
 unit *FLAGS: check
   go test ./... -cover -vet=off -race {{FLAGS}} -short
 
+# Fuzz one target for the given duration. The decoder is the target that matters
+# most: it is the only code reachable from an unauthenticated TCP port before any
+# session state exists.
+[group('test')]
+fuzz target='FuzzDecodeHeader' time='60s':
+  go test ./protocol -run '^$' -fuzz='^{{target}}$' -fuzztime={{time}}
+
+# Fuzz every target in sequence.
+[group('test')]
+fuzzall time='60s':
+  #!/usr/bin/env bash
+  set -euo pipefail
+  for t in FuzzDecodeHeader FuzzReadPayload FuzzWriteMessage; do
+    echo "== $t =="
+    go test ./protocol -run '^$' -fuzz="^${t}\$" -fuzztime={{time}}
+  done
+
+# Assert that the device-side data path does not allocate. Excluded from race
+# builds, because the race detector adds allocations of its own.
+[group('device')]
+allocs:
+  go test ./protocol -run TestCodecDoesNotAllocate -v
+
 # HTML report for unit (default), int, e2e, or all tests.
 [group('test')]
 cover test='unit': check

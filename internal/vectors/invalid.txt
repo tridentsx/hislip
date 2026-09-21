@@ -1,0 +1,34 @@
+# HiSLIP malformed header vectors
+#
+# Inputs a conforming decoder must reject, with the reason it must reject them.
+#
+# Format, whitespace separated, one record per line:
+#
+#   name  wire-hex  reason
+#
+# wire-hex  the bytes as hex, or "-" for an empty byte string
+# reason    "prologue"  the two-byte "HS" signature is absent
+#           "short"     fewer than 16 bytes were supplied
+#
+# A decoder must not reject anything else at this layer. Undefined message
+# types, reserved message types and implausible payload lengths all decode
+# successfully on purpose, because a receiver has to decode a header it intends
+# to reject in order to consume the payload and stay synchronised with the peer.
+# Those cases live in headers.txt, not here.
+
+# --- absent or wrong prologue --------------------------------------------
+all-zero          00000000000000000000000000000000  prologue
+lowercase         68730000000000000000000000000000  prologue
+swapped           53480000000000000000000000000000  prologue
+first-byte-only   48580000000000000000000000000000  prologue
+second-byte-only  58530000000000000000000000000000  prologue
+ascii-text        474554202f20485454502f312e310d0a  prologue
+random            deadbeefdeadbeefdeadbeefdeadbeef  prologue
+
+# --- too short -----------------------------------------------------------
+# A valid prologue is not enough; the decoder must have all 16 bytes before it
+# reads any multibyte field.
+empty             -                                 short
+one-byte          48                                short
+prologue-only     4853                              short
+fifteen-bytes     485300000100475400000000000000    short
