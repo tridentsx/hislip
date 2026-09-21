@@ -10,10 +10,63 @@
 # Output of the go coverage tool
 *.out
 
+# Go fuzzing corpus entries are deliberately NOT ignored. An input that fails is
+# worth keeping as a regression seed, which is why CI uploads them as artifacts.
+# If protocol/testdata/fuzz/ appears, commit it.
+
 # TinyGo firmware artefacts
 *.uf2
 *.elf
 *.hex
 
+# Compiled interoperability clients. The sources in interop/ are tracked; the
+# binaries built from them are not.
+interop/libhislip_client
+interop/hslclient
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# KiCad, once hardware/ exists.
+#
+# The rule is that anything KiCad regenerates from the schematic or board is
+# ignored, and anything a human authored is tracked. Custom symbol and footprint
+# libraries are authored and must be committed: a schematic that references a
+# symbol nobody else has is not reproducible.
+*.kicad_prl
+*-backups/
+*.kicad_sch-bak
+*.kicad_pcb-bak
+_autosave-*
+fp-info-cache
+~*.lck
+
+# Generated manufacturing and review outputs. Keep these out of the history and
+# regenerate them with kicad-cli, so that the schematic remains the single source
+# of truth and a stale Gerber cannot be mistaken for the current one.
+hardware/output/
+hardware/gerbers/
+*.gbr
+*.drl
+
+# Local working notes, not part of the deliverable. The session handover lives
+# here so that it can be candid about unfinished work without that becoming part
+# of the project's public record.
+*.local.md
+HANDOVER*.md
+
 # Local scratch backup of the Revision 2 spec, superseded by git history
 .gotmc-hislip-poe-gpib-design-spec-rev2.bak
+
+# Repository backup bundles
+*.bundle
+
+# Editor and OS noise
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
