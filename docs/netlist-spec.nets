@@ -1,0 +1,206 @@
+# Canonical net table — PoE-to-GPIB adapter, Revision 2 (discrete board).
+# Machine-readable form of docs/netlist-spec.md sections 5.1-5.4, 5.7, 6, 7.
+# Scope: the DECISION / SAFETY subsystems (power rails, transceiver-rail gate,
+# GPIB safe-state bias, GPIB signal path, IEEE-488 connector, USB power rule).
+# The MCU (U1) and Ethernet (U2) support blocks are entered from their reference
+# designs (netlist-spec.md sections 5.5/5.6) and are declared here as partial
+# reference components (!part) rather than fully enumerated.
+#
+# Grammar:
+#   # comment
+#   !pins REF N            full component: pins are numbered 1..N, all must appear
+#   !part REF              reference/partial component: listed pins validated, no completeness
+#   !gpio SIGNAL NUM       RP2354 GPIO number of SIGNAL (contiguity checks)
+#   !req  R-HW-0NN         requirement that must be covered by a @cover line
+#   !nc   REF.pin reason   explicit non-connection
+#   NETNAME: REF.pin ...   a net and every pin on it
+#   @cover R-HW-0NN ...    requirement coverage note
+
+# ---- full components (numeric pins, completeness enforced) ----
+!pins U3 20      # SN75160BDW  GPIB data transceiver
+!pins U4 20      # SN75161BDW  GPIB management transceiver
+!pins J1 24      # IEEE-488 connector
+
+# ---- partial / reference-block components (pins by name, no completeness) ----
+!part U1         # RP2354A MCU (support per RP2350-minimal; only decision pins listed)
+!part U2         # W5500 (support per W5500 reference; only rail pins listed)
+!part U5         # AP2114H-3.3 LDO
+!part U6         # 3V3 supervisor
+!part Q1         # AO3401 P-FET high-side switch
+!part Q2         # 2N7002 N-FET level-shift
+!part M1         # WIZPoE-P1 PoE PD
+!part J2         # PoE RJ45 MagJack
+!part J3         # USB-C
+!part R_G1
+!part R_G2
+!part C_G
+!part C_BULK
+!part C_LDOin
+!part C_LDOout
+!part C_3V3
+!part C_U3a
+!part C_U4a
+!part C_U3b
+!part C_U4b
+!part RSET
+!part R_TE
+!part R_DC
+!part R_ATN
+!part R_REN
+!part R_IFC
+!part R_SRQ
+!part R_CFG
+!part R_RUN
+!part R_PE
+!part R_CC1
+!part R_CC2
+!part R_SH
+!part C_SH
+!part TP_5V
+!part TP_3V3
+!part TP_GND
+!part TP_TE
+!part TP_DC
+!part TP_ATN
+!part TP_DAV
+!part TP_NRFD
+!part TP_NDAC
+!part TP_SRQ
+!part TP_IFC
+!part TP_GPIO22
+
+# ---- RP2354 GPIO assignment (R-HW-060 / R-HW-061) ----
+!gpio DIO1 0
+!gpio DIO2 1
+!gpio DIO3 2
+!gpio DIO4 3
+!gpio DIO5 4
+!gpio DIO6 5
+!gpio DIO7 6
+!gpio DIO8 7
+!gpio ATN 8
+!gpio SRQ 9
+!gpio REN 10
+!gpio IFC 11
+!gpio EOI 12
+!gpio DAV 13
+!gpio NDAC 14
+!gpio NRFD 15
+!gpio TE 26
+!gpio DC 27
+!gpio CFG 28
+!gpio SPARE 22
+
+# ---- requirements to cover ----
+!req R-HW-010
+!req R-HW-011
+!req R-HW-012
+!req R-HW-020
+!req R-HW-021
+!req R-HW-022
+!req R-HW-030
+!req R-HW-031
+!req R-HW-032
+!req R-HW-040
+!req R-HW-041
+!req R-HW-042
+!req R-HW-043
+!req R-HW-044
+!req R-HW-050
+!req R-HW-051
+!req R-HW-052
+!req R-HW-053
+!req R-HW-060
+!req R-HW-061
+!req R-HW-062
+!req R-HW-063
+!req R-HW-064
+!req R-HW-065
+
+# ---- power and gate nets ----
++5V_POE:  M1.OUT U5.IN Q1.S R_G1.a C_BULK.1 C_LDOin.1 TP_5V.1
++3V3:     U5.OUT U1.IOVDD U1.VREG_VIN U2.AVDD U2.VDD U6.VDD R_DC.a R_ATN.a R_REN.a R_IFC.a R_SRQ.a R_CFG.a R_RUN.a C_3V3.1 C_LDOout.1 TP_3V3.1
++5V_XCVR: Q1.D U3.20 U4.20 R_PE.a C_U3a.1 C_U4a.1 C_U3b.1 C_U4b.1
+GATE:     Q1.G R_G1.b C_G.1 Q2.D
+PG_3V3:   U6.RESET Q2.G R_G2.a
+GND:      U1.GND U2.AGND U3.10 U4.10 U5.GND U6.GND Q2.S M1.GND J2.GND RSET.b R_TE.b R_G2.b R_CC1.b R_CC2.b R_SH.b C_SH.b C_G.2 C_BULK.2 C_3V3.2 C_LDOin.2 C_LDOout.2 C_U3a.2 C_U4a.2 C_U3b.2 C_U4b.2 J1.18 J1.19 J1.20 J1.21 J1.22 J1.23 J1.24 TP_GND.1
+
+# ---- control nets ----
+TE:  U1.GPIO26 U3.1 U4.1 R_TE.a TP_TE.1
+DC:  U1.GPIO27 U4.11 R_DC.b TP_DC.1
+PE:  U3.11 R_PE.b
+
+# ---- GPIB data path (U3 -> J1) ----
+DIO1_T: U1.GPIO0 U3.19
+DIO2_T: U1.GPIO1 U3.18
+DIO3_T: U1.GPIO2 U3.17
+DIO4_T: U1.GPIO3 U3.16
+DIO5_T: U1.GPIO4 U3.15
+DIO6_T: U1.GPIO5 U3.14
+DIO7_T: U1.GPIO6 U3.13
+DIO8_T: U1.GPIO7 U3.12
+DIO1_B: U3.2 J1.1
+DIO2_B: U3.3 J1.2
+DIO3_B: U3.4 J1.3
+DIO4_B: U3.5 J1.4
+DIO5_B: U3.6 J1.13
+DIO6_B: U3.7 J1.14
+DIO7_B: U3.8 J1.15
+DIO8_B: U3.9 J1.16
+
+# ---- GPIB management path (U4 -> J1), with R-HW-041 pull-ups ----
+ATN_T:  U1.GPIO8 U4.13 R_ATN.b
+SRQ_T:  U1.GPIO9 U4.12 R_SRQ.b
+REN_T:  U1.GPIO10 U4.19 R_REN.b
+IFC_T:  U1.GPIO11 U4.18 R_IFC.b
+EOI_T:  U1.GPIO12 U4.14
+DAV_T:  U1.GPIO13 U4.15
+NDAC_T: U1.GPIO14 U4.17
+NRFD_T: U1.GPIO15 U4.16
+ATN_B:  U4.8 J1.11 TP_ATN.1
+SRQ_B:  U4.9 J1.10 TP_SRQ.1
+REN_B:  U4.2 J1.17
+IFC_B:  U4.3 J1.9 TP_IFC.1
+EOI_B:  U4.7 J1.5
+DAV_B:  U4.6 J1.6 TP_DAV.1
+NDAC_B: U4.4 J1.8 TP_NDAC.1
+NRFD_B: U4.5 J1.7 TP_NRFD.1
+
+# ---- USB, config, spare, shield ----
+USB_DP: U1.USB_DP J3.DP
+USB_DM: U1.USB_DM J3.DM
+CC1:    J3.CC1 R_CC1.a
+CC2:    J3.CC2 R_CC2.a
+CFG:    U1.GPIO28 R_CFG.b
+TP_SPARE: U1.GPIO22 TP_GPIO22.1
+SHIELD: J1.12 R_SH.a C_SH.a
+
+# ---- explicit non-connections ----
+!nc J3.VBUS no_PoE_to_USB_backfeed_design-spec_30.1
+!nc U1.RUN_note reset_via_R_RUN_SW_RUN_per_reference
+
+# ---- requirement coverage ----
+@cover R-HW-010 by silkscreen+enclosure label (doc/inspection)
+@cover R-HW-011 by product documentation (doc)
+@cover R-HW-012 by firmware detect + status LED (firmware)
+@cover R-HW-020 by Q1 gate net +5V_XCVR net PG_3V3 net GATE U5 U6 Q1 Q2 R_G1 R_G2
+@cover R-HW-021 by validation measurement (val)
+@cover R-HW-022 by U6 threshold 3.0-3.08V + R_G1 C_G ramp (doc)
+@cover R-HW-030 by R_TE R_DC R_ATN R_REN R_IFC R_SRQ external bias; RP2354 A4 fixes E9
+@cover R-HW-031 by turnaround bias + E9 fixed on A4 (val)
+@cover R-HW-032 by record RP2354 A4 stepping (val)
+@cover R-HW-040 by R_TE R_DC R_SRQ net TE net DC
+@cover R-HW-041 by R_ATN R_REN R_IFC net ATN_T net REN_T net IFC_T
+@cover R-HW-042 by passive bias + Q1 gating (val scope)
+@cover R-HW-043 by oscilloscope capture (val)
+@cover R-HW-044 by Q1 gating primary + bias secondary
+@cover R-HW-050 by power budget section 3.3 (doc)
+@cover R-HW-051 by C_BULK R_G1 C_G soft-start
+@cover R-HW-052 by measured figures (val)
+@cover R-HW-053 by thermal check incl U5 hot spot (val)
+@cover R-HW-060 by DIO1..DIO8 GPIO0..7 contiguous
+@cover R-HW-061 by EOI DAV NDAC NRFD GPIO12..15 consecutive
+@cover R-HW-062 by GPIO map documented load-bearing (doc)
+@cover R-HW-063 by GPIO0/1 = DIO1/DIO2 UART0 unavailable USB CDC (doc)
+@cover R-HW-064 by status LED on spare GPIO recorded in board package
+@cover R-HW-065 by TP_SPARE (GPIO22) + R_CFG (GPIO28 defined state)

@@ -107,6 +107,29 @@ Revision 3 retains the TinyGo firmware path, adds PIO as a required firmware mec
 
 ---
 
+## Revision 4 changes (proposed, not yet adopted)
+
+Recorded here so the specification does not silently contradict the board. These
+originate from the production-hardware decisions captured in
+[netlist-spec.md](netlist-spec.md) §0 and are **proposed** pending review. The
+`R-HW-*` requirements, the GPIO map (§28) and the GPIB physical layer (§26.3) are
+unchanged by them.
+
+- **Production board is discrete, not the module.** §26.1 and stable-decision 11
+  name the W5500-EVB-Pico2 module; it remains the *development* platform, but the
+  product is built from discrete **RP2354A + W5500**. netlist-spec.md realises this.
+- **RP2350 → RP2354A.** The QFN-60 RP2354A (2 MB internal flash, no external QSPI)
+  on the **A4 stepping fixes erratum RP2350-E9**, relaxing the input-latch basis of
+  `R-HW-030`/`R-HW-031` (external bias retained for direction control). Affects §27.2.
+- **Supply-sequencing element (§27.1, `R-HW-020`).** Realised as a discrete
+  P-FET/N-FET high-side gate driven by a 3.3 V-regulator-good supervisor, replacing
+  the load-switch-IC + separate-supervisor reading. The requirement is unchanged;
+  only the implementing part changes.
+- **Sourcing/assembly.** Hand-assembled first article, passives 0805 minimum, every
+  BOM line an LCSC part number (JLCPCB-ready). GPIB transceiver EOL is risk **R24**.
+
+---
+
 ## 1.1 Conformance language and requirement identifiers
 
 The key words **MUST**, **MUST NOT**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT** and **MAY** are to be interpreted as described in RFC 2119.
@@ -3539,6 +3562,9 @@ R22  no commercial instrument in the test set,   deferred not cancelled;      §
                                                  implementations meanwhile
 R23  a third-party test implementation changes   record version or commit     §24.4
      or becomes unavailable                      per release                  R-DOC-063
+R24  SN75160B/SN75161B GPIB transceivers EOL'd   bulk buy (100s) covers v1 +  §26.3
+     by TI (PDN 20230516001.3); no form-fit-     PCBA rev + spares; Rochester
+     function replacement from TI                / '245 PHY as deeper fallback
 ```
 
 [R-DOC-011] The risk register MUST be reviewed at each milestone exit. A risk MUST NOT be closed without either evidence that it did not materialise or a record of the response taken.
