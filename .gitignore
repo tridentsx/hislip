@@ -1,0 +1,19 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# TinyGo firmware artefacts
+*.uf2
+*.elf
+*.hex
+
+# Local scratch backup of the Revision 2 spec, superseded by git history
+.gotmc-hislip-poe-gpib-design-spec-rev2.bak
