@@ -369,6 +369,17 @@ Table 4 lists `DeviceClearAcknowledge` (type 9) as an **asynchronous** message. 
 
 [R-PROTO-041] The interoperability tests of §24.4 MUST confirm this against at least two independent third-party HiSLIP clients before Milestone 2 closes. If a client is found that sends or expects it on the asynchronous channel, this requirement is to be revisited rather than worked around silently.
 
+**Status: one of two confirmations obtained.** pyvisa-py 0.8.1 reads the message from the synchronous channel. Its `device_clear_complete` is unambiguous:
+
+```python
+send_msg(self._sync, "DeviceClearComplete", feature_bitmap, 0)
+response = DeviceClearAcknowledge(self._sync)
+```
+
+A device clear driven by that client against this implementation completes successfully, which it could not if the channels disagreed. One more independent client, NI-VISA or `lxi-tools/libhislip`, is still required before this is closed.
+
+While confirming the above, pyvisa-py was also observed to agree with §4.2 on every MessageID rule: the counter initialises to `0xffffff00`, increments by two masked to 32 bits, resets to `0xffffff00` after device clear, and treats `0xffffffff` as the non-correlating value. That is independent corroboration of the constants transcribed there.
+
 ---
 
 ## 5. Repository/package structure
@@ -1247,6 +1258,14 @@ The inverse error, a query the detector classified as `NoResponseExpected` when 
 [R-DEV-013] The firmware MUST provide a configurable stale-response flush. When enabled, before addressing the instrument as listener for a new program message the bridge performs a serial poll, and if MAV is set it reads and discards the pending response, counting the event.
 
 [R-DEV-014] The `GOTMC_EXPLICIT` and `ALWAYS_READ` read policies (§48) avoid the misclassification entirely and MUST be documented as the remedy for instruments where the heuristic proves unreliable.
+
+[R-DEV-015] The read policy MUST classify a program message incrementally, without accumulating it. A logical program message may be arbitrarily larger than any buffer in the adapter (R-FW-130), so any accumulate-then-classify design has a length above which it is wrong.
+
+[R-DEV-016] A policy MUST carry its lexical state across message chunks, so that a quoted string, a doubled-quote escape or an arbitrary-block header split between two `Data` messages does not change the classification.
+
+[R-DEV-017] A policy instance MUST belong to one session. Lexical state is per-message, so sharing an instance would let an unterminated string in one session change the classification in another.
+
+R-DEV-015 is recorded because it was learned the hard way. An implementation that accumulated the program message into a buffer bounded by the negotiated maximum silently truncated anything longer, so a 9810-byte compound message whose only query marker fell in the final chunk was classified as a command; the response was never read and the client timed out after its full timeout. No unit test in this project caught it. pyvisa-py did, on the first attempt at a long compound write.
 
 ### 17.4 Vendor extension wire format
 
@@ -3492,7 +3511,7 @@ SRV     030-033      §21.1                 §63
 SRV     040-044      §47.1                 §63, §65
 SRV     050-056      §47.2                 §65
 SRV     060-063      §20.1                 §63
-DEV     010-014      §17.3                 §63
+DEV     010-017      §17.3                 §63
 DEV     020-027      §38.1                 §63
 FW      010-014      §5.2                  §65
 FW      020-025      §23.1                 §65

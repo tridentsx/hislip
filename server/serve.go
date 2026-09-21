@@ -268,13 +268,12 @@ func (s *Server) handleData(
 		return s.reportOperationError(sess, w, err)
 	}
 
-	sess.appendProgramMessage(msg.payload)
+	sess.feedProgramMessage(msg.payload)
 	if msg.header.Type != protocol.DataEnd {
 		return nil
 	}
 
-	program := sess.takeProgramMessage()
-	if s.policy.Disposition(program) != ResponseExpected {
+	if sess.programDisposition() != ResponseExpected {
 		return tx.Complete()
 	}
 

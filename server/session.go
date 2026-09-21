@@ -97,10 +97,10 @@ type Session struct {
 	// predicate of the interrupted check.
 	pending func() bool
 
-	// program accumulates the current client program message, so that the
-	// response policy can inspect it whole. It is allocated once per session and
-	// reused.
-	program []byte
+	// policy classifies the current program message incrementally. It is fed as
+	// each chunk arrives, so a message longer than any buffer is still
+	// classified correctly; see the note on ResponsePolicy.
+	policy ResponsePolicy
 }
 
 // Transaction returns the session's synchronized transaction state.
@@ -153,36 +153,35 @@ func (s *Session) syncPending() func() bool {
 	return f
 }
 
-// appendProgramMessage accumulates a chunk of the client's program message.
+// feedProgramMessage passes a chunk of the client's program message to the
+// response policy.
 //
-// The accumulated message exists so that the response policy can inspect the
-// whole thing. A policy cannot decide from a fragment: a query marker may fall in
-// any chunk, and a quoted string or binary block may straddle a boundary.
-func (s *Session) appendProgramMessage(p []byte) {
+// Nothing is accumulated. A policy cannot decide from a fragment in isolation, so
+// it carries its own lexical state across chunks instead; that is what lets a
+// program message of any length be classified without a buffer to overflow or
+// truncate. See ResponsePolicy.
+func (s *Session) feedProgramMessage(p []byte) {
 	if len(p) == 0 {
 		return
 	}
 	s.mu.Lock()
-	if s.program == nil {
-		s.program = make([]byte, 0, s.maxRx)
-	}
-	// Bound the accumulation. A client that never terminates its program message
-	// must not be able to grow this without limit, which would be a denial of
-	// service on an unauthenticated port.
-	if uint64(len(s.program)+len(p)) <= s.maxRx {
-		s.program = append(s.program, p...)
+	if s.policy != nil {
+		s.policy.Feed(p)
 	}
 	s.mu.Unlock()
 }
 
-// takeProgramMessage returns the accumulated program message and resets the
-// accumulator, keeping its capacity.
-func (s *Session) takeProgramMessage() []byte {
+// programDisposition reports whether the completed program message expects a
+// response, and resets the policy for the next one.
+func (s *Session) programDisposition() Disposition {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := s.program
-	s.program = s.program[:0]
-	return out
+	if s.policy == nil {
+		return NoResponseExpected
+	}
+	d := s.policy.Disposition()
+	s.policy.Reset()
+	return d
 }
 
 // newSession returns a session in StatePairing holding the synchronous channel.

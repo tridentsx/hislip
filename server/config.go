@@ -49,10 +49,11 @@ type Config struct {
 	// Zero means the default.
 	MaxTxPayload uint64
 
-	// Policy decides whether a completed program message expects a response. It
-	// defaults to SCPIQueryPolicy. See §48 and the discussion of the generic
-	// GPIB-read problem in §17.
-	Policy ResponsePolicy
+	// Policy creates the response policy for each session. It defaults to
+	// SCPIQueryPolicy. A factory rather than a policy, because a policy carries
+	// per-message lexical state and so cannot be shared between sessions. See
+	// §48 and the generic GPIB-read problem of §17.
+	Policy PolicyFactory
 
 	// VendorID is the two-character vendor identifier reported in
 	// AsyncInitializeResponse. It defaults to zero, meaning unidentified,

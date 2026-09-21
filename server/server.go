@@ -29,8 +29,8 @@ type Server struct {
 	// clients, so it cannot live inside the session it protects against.
 	locks LockManager
 
-	// policy decides whether a completed program message expects a response.
-	policy ResponsePolicy
+	// newPolicy creates a response policy per session.
+	newPolicy PolicyFactory
 
 	countersMu sync.Mutex
 	counters   Counters
@@ -49,16 +49,16 @@ func New(dev Device, cfg Config) (*Server, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
-	policy := cfg.Policy
-	if policy == nil {
-		policy = SCPIQueryPolicy{}
+	newPolicy := cfg.Policy
+	if newPolicy == nil {
+		newPolicy = func() ResponsePolicy { return NewSCPIQueryPolicy() }
 	}
 	return &Server{
-		cfg:      cfg,
-		dev:      dev,
-		policy:   policy,
-		sessions: make(map[uint16]*Session),
-		nextID:   1,
+		cfg:       cfg,
+		dev:       dev,
+		newPolicy: newPolicy,
+		sessions:  make(map[uint16]*Session),
+		nextID:    1,
 	}, nil
 }
 
@@ -103,6 +103,7 @@ func (s *Server) allocateSession(
 		return nil, ErrMaxClients
 	}
 	sess := newSession(id, version, syncStream, s.cfg)
+	sess.policy = s.newPolicy()
 	s.sessions[id] = sess
 	return sess, nil
 }
