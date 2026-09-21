@@ -156,7 +156,12 @@ func (s *Server) runSync(ctx context.Context, sess *Session, stream Stream) erro
 	sess.setSyncPending(r.pending)
 
 	tx := sess.Transaction()
-	scratch := make([]byte, sess.MaxTxPayload())
+
+	// Allocated once at the server's configured maximum, then sliced per response
+	// to whatever the session's transmit limit currently is. The limit can be
+	// lowered at any time by the maximum message size transaction, so it cannot
+	// be captured here.
+	buf := make([]byte, s.cfg.MaxTxPayload)
 
 	for {
 		if ctx.Err() != nil {
@@ -166,7 +171,7 @@ func (s *Server) runSync(ctx context.Context, sess *Session, stream Stream) erro
 		if !ok {
 			return nil
 		}
-		err := s.handleSync(ctx, sess, tx, msg, scratch)
+		err := s.handleSync(ctx, sess, tx, msg, buf)
 		r.release(msg.buf)
 		if err != nil {
 			return err
@@ -180,7 +185,7 @@ func (s *Server) handleSync(
 	sess *Session,
 	tx *Transaction,
 	msg message,
-	scratch []byte,
+	buf []byte,
 ) error {
 	w := sess.SyncWriter()
 
@@ -202,7 +207,7 @@ func (s *Server) handleSync(
 
 	switch msg.header.Type {
 	case protocol.Data, protocol.DataEnd:
-		return s.handleData(ctx, sess, tx, msg, w, scratch)
+		return s.handleData(ctx, sess, tx, msg, w, buf)
 
 	case protocol.Trigger:
 		interrupted, err := s.Trigger(ctx, sess, tx, msg.header)
@@ -260,7 +265,7 @@ func (s *Server) handleData(
 	tx *Transaction,
 	msg message,
 	w *MessageWriter,
-	scratch []byte,
+	buf []byte,
 ) error {
 	interrupted, err := s.ReceiveData(ctx, sess, tx, msg.header, msg.payload)
 	s.countInterrupted(interrupted)
@@ -284,7 +289,7 @@ func (s *Server) handleData(
 		Sync:        w,
 		Async:       sess.AsyncWriter(),
 		MessageID:   msg.header.MessageID(),
-		Scratch:     scratch,
+		Scratch:     responseScratch(buf, sess.MaxTxPayload()),
 		InputQueued: sess.syncPending(),
 	})
 	s.countOutcome(outcome)
@@ -459,7 +464,26 @@ func (s *Server) reportOperationError(sess *Session, w *MessageWriter, err error
 	if w == nil {
 		return nil
 	}
-	return w.WriteError(CodeHandshakeTimeout, err.Error())
+	// A backend failure has no IVI-defined code, so it is reported with a
+	// device-defined one. A condition the codec recognised keeps the code
+	// WireErrorFor computed for it; discarding that in favour of a fixed code,
+	// as an earlier version did, told the client the wrong thing.
+	code := wire.Code
+	if code == protocol.NonFatalUnidentified {
+		code = CodeHandshakeTimeout
+	}
+	return w.WriteError(code, err.Error())
+}
+
+// responseScratch returns buf sliced to the session's current transmit limit.
+//
+// The limit is honoured rather than merely checked, because a client is entitled
+// to lower it mid-session and every response after that must fit.
+func responseScratch(buf []byte, limit uint64) []byte {
+	if limit == 0 || limit >= uint64(len(buf)) {
+		return buf
+	}
+	return buf[:limit]
 }
 
 // readSubAddress reads the payload of an Initialize message as an ASCII

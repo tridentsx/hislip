@@ -116,30 +116,46 @@ func (s *Server) asyncInitializeResponse(sess *Session) protocol.Header {
 }
 
 // MaximumMessageSize handles an AsyncMaximumMessageSize message and returns the
-// response.
+// response together with the size to put in its payload.
 //
 // This transaction requires no bus access, so it is a class 0 operation and must
 // be answered even while a GPIB transfer is in progress; see §47.1 and
 // R-SRV-040. Queueing it behind instrument I/O, as a single operation queue
 // would, delays it for no reason.
 //
-// The payload of both messages is an 8-byte big-endian maximum message size. The
-// server answers with the smaller of its own maximum and the client's.
+// The direction of each half is easy to get backwards, and IVI-6.1 Table 28 is
+// explicit about both. The client's value tells the server the largest message it
+// may **send**, so it becomes this session's transmit limit. The server's reply
+// tells the client the largest message the server can **receive**, so it carries
+// this server's receive limit. It is not a negotiation of a common minimum: the
+// two directions are independent and are kept per session, as the standard
+// requires.
+//
+// An earlier version of this method returned the smaller of the two values and
+// applied it to the transmit limit. A client that asked for a smaller maximum than
+// the server's default therefore ended up with a transmit limit below the
+// already-allocated response buffer, and every subsequent response failed
+// validation. libhislip found that on its first query.
 func (s *Server) MaximumMessageSize(
 	sess *Session,
 	clientMax uint64,
 ) (protocol.Header, uint64) {
-	agreed := clientMax
-	if agreed == 0 || agreed > s.cfg.MaxTxPayload {
-		agreed = s.cfg.MaxTxPayload
-	}
-	if sess != nil {
+	if sess != nil && clientMax >= minMaximumMessageSize {
 		sess.mu.Lock()
-		sess.maxTx = agreed
+		sess.maxTx = clientMax
 		sess.mu.Unlock()
 	}
 	return protocol.Header{
 		Type:   protocol.AsyncMaximumMessageSizeResponse,
 		Length: 8,
-	}, agreed
+	}, s.cfg.MaxRxPayload
 }
+
+// minMaximumMessageSize is the smallest transmit limit this server will honour.
+//
+// IVI-6.1 says neither peer is obliged to accept a particular size beyond what
+// initialization needs, so a client may in principle ask for something absurdly
+// small. Rather than let a pathological value reduce every response to
+// single-byte packets, values below this are ignored and the server keeps its
+// default. The floor is generous enough to carry a status or error message whole.
+const minMaximumMessageSize = 256

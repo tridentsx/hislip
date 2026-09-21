@@ -369,14 +369,25 @@ Table 4 lists `DeviceClearAcknowledge` (type 9) as an **asynchronous** message. 
 
 [R-PROTO-041] The interoperability tests of §24.4 MUST confirm this against at least two independent third-party HiSLIP clients before Milestone 2 closes. If a client is found that sends or expects it on the asynchronous channel, this requirement is to be revisited rather than worked around silently.
 
-**Status: one of two confirmations obtained.** pyvisa-py 0.8.1 reads the message from the synchronous channel. Its `device_clear_complete` is unambiguous:
+**Status: satisfied.** Two independent clients read the message from the synchronous channel, each confirmed both by source inspection and by a device clear that completes against this implementation.
+
+pyvisa-py 0.8.1, in `device_clear_complete`:
 
 ```python
 send_msg(self._sync, "DeviceClearComplete", feature_bitmap, 0)
 response = DeviceClearAcknowledge(self._sync)
 ```
 
-A device clear driven by that client against this implementation completes successfully, which it could not if the channels disagreed. One more independent client, NI-VISA or `lxi-tools/libhislip`, is still required before this is closed.
+PyHiSLIP, in `device_clear`:
+
+```python
+header = self._read_hislip_message(
+    self.sync_channel, self.message_types['DeviceClearAcknowledge'])[0]
+```
+
+PyHiSLIP additionally annotates its message table with the channel, and gives `DeviceClearAcknowledge` as `# S, S`, server and synchronous, against `AsyncDeviceClearAcknowledge` as `# S, A`.
+
+The conclusion is that IVI-6.1 Table 4 is wrong about this message and the transaction description in section 6.12 is right. No implementation has been found that expects it on the asynchronous channel.
 
 While confirming the above, pyvisa-py was also observed to agree with §4.2 on every MessageID rule: the counter initialises to `0xffffff00`, increments by two masked to 32 bits, resets to `0xffffff00` after device clear, and treats `0xffffffff` as the non-correlating value. That is independent corroboration of the constants transcribed there.
 
@@ -1700,6 +1711,49 @@ lxi-tools/libhislip           C client API
 [R-DOC-064] Testing against a commercial HiSLIP instrument is deferred, not cancelled. What it would add over the software implementations is coverage of vendor-specific behaviour, real-world timing, and the mDNS discovery path as a shipping product implements it. It SHOULD be done before the server library is declared stable.
 
 Note on why software is sufficient for now: the risk a physical instrument uniquely addresses is that a real vendor implementation deviates from the standard in ways software written from the same standard does not. That risk is real but it is reduced, not created, by first passing against three independent software implementations written by three unrelated authors.
+
+#### 24.4.1 Client capability matrix
+
+No single client exercises the whole protocol, which is why more than one is required. Measured coverage:
+
+```text
+transaction              pyvisa-py  PyHiSLIP  libhislip
+initialization, both ch.     yes       yes       yes
+maximum message size          no       yes       yes
+Data / DataEnd query         yes       yes       yes
+command, no response         yes       yes       yes
+chunked response             yes       yes        no
+device clear                 yes       yes        no
+status query                 yes       yes        no
+trigger                       no       yes        no
+lock request/release/info     no       yes        no
+```
+
+[R-DOC-065] The capability matrix MUST be kept current, because a gap in it is a transaction believed to work on no evidence. Trigger and locking are covered by one client only, and a second SHOULD be found before release.
+
+#### 24.4.2 Defects found by interoperability testing
+
+Recorded because each is an argument for the practice, and because each was invisible to a full unit suite.
+
+**Query misclassification on long messages.** Found by pyvisa-py on the first compound write longer than the negotiated payload. The program message was accumulated into a bounded buffer and silently truncated, so a query marker in the tail was lost and the response never read. See R-DEV-015.
+
+**Maximum message size direction.** Found by libhislip on its first query. The server returned the smaller of the two sizes and applied it to its transmit limit; IVI-6.1 Table 28 makes the two directions independent. The reply must carry the server's receive limit.
+
+**Response buffer sized once.** Found by the same libhislip run. The response buffer was allocated when the channel loop started and sized from the transmit limit at that moment, so a client that lowered the limit afterwards broke every subsequent response.
+
+**Silent interrupted error observed live.** PyHiSLIP tripped the RMT-mismatch check once during an otherwise clean session. No wire traffic resulted and the session continued without failure, which is the specified behaviour and confirms the mechanism is live rather than dead code. It also exercises the interpretation recorded on R-SYNC-013, that RMT-expected is cleared after a mismatch: had it not been, the remainder of that session would have produced an error per message.
+
+#### 24.4.3 Limitations of the available clients
+
+Recorded so that a future failure is not mistaken for a regression here.
+
+`libhislip` is at its initial import and is incomplete in two ways that matter. Its `hs_sync_send` computes a chunk count but then passes the full length and an unadvanced data pointer to `msg_create`, so it emits one message however large and violates the maximum message size it has just negotiated. Its `hs_sync_receive` loops until `DataEnd` but its payload reassembly is two TODO comments with no code, so it cannot receive a chunked response. Neither is a defect in this implementation; a server that chunks correctly, as this one does, appears to hang to that client.
+
+`pyvisa-py` does not implement `viAssertTrigger` or `viLock` for HiSLIP, so it reports those as unsupported operations rather than exercising them.
+
+`PyHiSLIP` uses `async` as a parameter name and so does not parse on Python 3.7 or later without a trivial rename.
+
+`scpify` exposes only connect, send and query, with no device clear, trigger or lock, so it would add a third check of the data path and nothing else.
 
 ### 24.5 Firmware tests
 
@@ -3537,7 +3591,7 @@ DOC     010-011      §1.1, §67             review
 DOC     020-021      §68                   review
 DOC     030-033      §5.1.1                §63
 DOC     040-046      §5.3                  review
-DOC     060-064      §24.4                 §63, §65
+DOC     060-065      §24.4                 §63, §65
 DOC     070-072      Part IV               review
 ```
 

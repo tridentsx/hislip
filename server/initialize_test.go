@@ -255,35 +255,34 @@ func TestSessionIDsAreUniqueAndNonZero(t *testing.T) {
 	}
 }
 
-func TestMaximumMessageSizeTakesTheSmaller(t *testing.T) {
+// TestMaximumMessageSizeResponseShape covers the message framing. The semantics
+// of each direction are covered by TestMaximumMessageSizeDirection in
+// maxsize_test.go, which replaced a test that asserted the wrong behaviour: it
+// expected the server to return the smaller of the two sizes, which is a
+// negotiation of a common minimum and is not what IVI-6.1 Table 28 describes.
+func TestMaximumMessageSizeResponseShape(t *testing.T) {
 	srv := newTestServer(t)
 	sess, _, err := srv.Initialize(initializeHeader(protocol.Version10, ""), "", nil)
 	if err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
-	// A client asking for less than the server's maximum gets what it asked for.
-	_, agreed := srv.MaximumMessageSize(sess, 1024)
-	if agreed != 1024 {
-		t.Errorf("agreed = %d, want 1024", agreed)
-	}
-	if sess.MaxTxPayload() != 1024 {
-		t.Errorf("MaxTxPayload() = %d, want 1024", sess.MaxTxPayload())
-	}
-
-	// A client asking for more is capped at the server's maximum.
-	_, agreed = srv.MaximumMessageSize(sess, 1<<30)
-	if agreed != srv.Config().MaxTxPayload {
-		t.Errorf("agreed = %d, want %d", agreed, srv.Config().MaxTxPayload)
-	}
-
-	// A response header declares an 8-byte payload carrying the size.
-	resp, _ := srv.MaximumMessageSize(sess, 4096)
+	resp, reported := srv.MaximumMessageSize(sess, 4096)
 	if resp.Type != protocol.AsyncMaximumMessageSizeResponse {
 		t.Errorf("response type = %v", resp.Type)
 	}
 	if resp.Length != 8 {
-		t.Errorf("response length = %d, want 8", resp.Length)
+		t.Errorf("response length = %d, want 8; the size travels in the payload", resp.Length)
+	}
+	if resp.Control != 0 || resp.Parameter != 0 {
+		t.Errorf("control = %#x, parameter = %#x; both must be zero", resp.Control, resp.Parameter)
+	}
+	if reported != srv.Config().MaxRxPayload {
+		t.Errorf("reported = %d, want the server's receive limit %d",
+			reported, srv.Config().MaxRxPayload)
+	}
+	if got := sess.MaxTxPayload(); got != 4096 {
+		t.Errorf("MaxTxPayload() = %d, want the client's limit 4096", got)
 	}
 }
 
