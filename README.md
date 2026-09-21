@@ -9,8 +9,19 @@ replacement for VXI-11 and requires no ONC/Sun RPC.
 ## Status
 
 Early development. Milestone 0 of the design specification, the protocol codec,
-is implemented. The client, server and vendor extension packages are not yet
-written.
+is implemented and its exit criterion is met: the decoder is fuzzed, and the
+data path is asserted to perform no heap allocation.
+
+The server is next, before the client. That inverts the milestone numbering
+deliberately — no HiSLIP-capable instrument is available on the development
+bench, so a finished client would have nothing to talk to, whereas a finished
+server can be driven immediately by NI-VISA, Keysight IO Libraries, pyvisa-py
+and `lxi-tools/libhislip`. The reasoning is recorded under "Execution order" in
+Part IV of the specification.
+
+Conformance is established against independent implementations rather than
+against this project's own two halves, which would agree with each other whether
+or not they agree with IVI-6.1.
 
 The design specification is [docs/design-spec.md](docs/design-spec.md). Section
 references in the source comments, such as "§5.1", refer to it.

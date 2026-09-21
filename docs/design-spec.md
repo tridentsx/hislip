@@ -1634,13 +1634,39 @@ mock Device.Trigger exactly once
 
 ### 24.4 Interoperability tests
 
-Client shall be tested against at least one commercial HiSLIP instrument or software server.
+Interoperability is the test that finds protocol misreadings. Unit tests confirm that the implementation does what its author intended; only an independent implementation confirms that the intention was right.
 
-Server shall be tested with at least:
+The project uses software implementations rather than a purchased instrument. No HiSLIP-capable instrument is available on the development bench, and the available software provides independent implementations on both sides of the protocol, which is what conformance actually requires.
 
-- Keysight VISA/Connection Expert;
-- NI-VISA;
-- PyVISA backend that supports HiSLIP.
+**Independent servers, for testing the client**
+
+```text
+lxi-tools/libhislip     C library with both client and server APIs
+Keysight PC software    Infiniium, FlexDCA and FlexOTO run a HiSLIP SCPI
+                        server on port 4880; check licensing for offline use
+luksan/hislip-server    Python HiSLIP server
+```
+
+**Independent clients, for testing the server**
+
+```text
+NI-VISA                       free
+Keysight IO Libraries Suite   free; includes Connection Expert
+pyvisa-py                     free, pure Python, implements HiSLIP
+lxi-tools/libhislip           C client API
+```
+
+[R-DOC-060] The client MUST be tested against at least one independent third-party server implementation. It MUST NOT be validated solely against this project's own server.
+
+[R-DOC-061] The server MUST be tested against at least two independent third-party client implementations. Two is the minimum because a single client's interpretation of an ambiguous requirement is indistinguishable from the requirement itself.
+
+[R-DOC-062] R-PROTO-041, the confirmation of the `DeviceClearAcknowledge` channel defect, MUST be settled using two of the clients above.
+
+[R-DOC-063] The version or commit of every third-party implementation used for a release's interoperability testing MUST be recorded in the validation report, because these are moving targets and a later failure needs a known baseline.
+
+[R-DOC-064] Testing against a commercial HiSLIP instrument is deferred, not cancelled. What it would add over the software implementations is coverage of vendor-specific behaviour, real-world timing, and the mDNS discovery path as a shipping product implements it. It SHOULD be done before the server library is declared stable.
+
+Note on why software is sufficient for now: the risk a physical instrument uniquely addresses is that a real vendor implementation deviates from the standard in ways software written from the same standard does not. That risk is real but it is reduced, not created, by first passing against three independent software implementations written by three unrelated authors.
 
 ### 24.5 Firmware tests
 
@@ -2945,6 +2971,37 @@ Avoid `fmt.Sprintf` in timing-sensitive GPIB paths.
 
 # PART IV — Development sequence
 
+## Execution order
+
+The milestones below are deliverables, not a schedule. Their numbering is stable and is referenced throughout Part V, so it does not change. The order in which they are executed does.
+
+Milestone 2, the host server, is executed **before** Milestone 1, the client:
+
+```text
+M0  protocol codec          complete
+M2  host Go server          next
+M1  Go HiSLIP client
+M3  VISA integration
+M4  GPIB electrical prototype
+M5  TinyGo HiSLIP server
+M6  SRQ and control semantics
+M7  GoTMC explicit-read extension
+M8  throughput and latency verification
+```
+
+Four reasons, in order of weight:
+
+1. **A client has nothing to talk to.** No HiSLIP-capable instrument is available on the development bench, so a completed client would be unusable until either a server or a purchase exists. A completed server is immediately testable against free third-party clients (§24.4).
+2. **The server attracts more independent scrutiny.** Three free third-party clients are available against one and a half servers. Hours spent on the server buy more interoperability evidence per hour.
+3. **R-PROTO-041 needs the server.** The one open protocol question in this document, the `DeviceClearAcknowledge` channel defect, can only be settled by third-party clients talking to our server.
+4. **The server is on the critical path to the product.** The client is a by-product of the library; the GPIB bridge is the deliverable.
+
+[R-DOC-070] Milestone 2 MUST be executed before Milestone 1. The milestone numbers MUST NOT be renumbered to match, because Part V references them.
+
+[R-DOC-071] The client MUST NOT be validated solely against this project's own server. See R-DOC-060. Executing the server first creates the temptation to do exactly that, and a client and server written by one author from one reading of the standard will agree with each other whether or not that reading is correct.
+
+[R-DOC-072] The conformance vectors of §24.1 are the independent oracle for both sides and MUST be the first thing either side is tested against, before any cross-testing.
+
 ## 54. Milestone 0 — protocol codec
 
 Deliver:
@@ -2975,7 +3032,7 @@ Implement:
 - status
 - close
 
-Test against a real commercial HiSLIP instrument/software endpoint.
+Test against an independent third-party HiSLIP server (§24.4). Executed after Milestone 2; see the execution order note at the head of Part IV.
 
 Exit criterion:
 
@@ -2983,22 +3040,33 @@ Exit criterion:
 inst.Query(ctx, "*IDN?")
 ```
 
-works reliably against an existing HiSLIP device.
+works reliably against an independent third-party HiSLIP server, and the Data, DataEnd, clear, trigger and status transactions behave identically against that server and against this project's own server.
+
+Revision 2 required a "real commercial HiSLIP instrument/software endpoint". The instrument half of that is deferred per R-DOC-064. The requirement that survives, and the one that matters, is independence: the client must be proven against an implementation it does not share an author with.
 
 ## 56. Milestone 2 — host Go server
 
-Implement server with mock Device.
+Implement server with mock Device. Executed before Milestone 1; see the execution order note at the head of Part IV.
 
 The first complete server profile shall be Synchronized Mode. Generic server support for Overlap Mode is optional and must not delay the GPIB bridge.
 
+This milestone delivers the Synchronized Mode machinery that everything else depends on, and which Revision 2 omitted:
+
+- RMT-expected and RMT-delivered tracking, with the two interrupted cases behaving differently (§11.3.1);
+- the Interrupted transaction, sending both messages (§11.3.2);
+- MAV computed from the AsyncStatusQuery MessageID (§11.4.1);
+- the four-message Device Clear sequence with its feature bitmap (§13.1);
+- channel-ordered operation dispatch, with class 0 operations never queued (§47.1).
+
 Validate with:
 
-- GoTMC client
 - NI-VISA
-- Keysight VISA
-- PyVISA
+- Keysight IO Libraries / Connection Expert
+- pyvisa-py
+- lxi-tools/libhislip client
+- GoTMC client, once Milestone 1 exists
 
-Exit criterion:
+Exit criteria:
 
 third-party VISA client can open:
 
@@ -3006,7 +3074,7 @@ third-party VISA client can open:
 TCPIP0::<host>::hislip0::INSTR
 ```
 
-and query the mock instrument.
+and query the mock instrument; and R-PROTO-041 is settled, with the `DeviceClearAcknowledge` channel behaviour confirmed against two independent clients and the result recorded in §4.4.
 
 ## 57. Milestone 3 — VISA integration
 
@@ -3207,6 +3275,9 @@ A release is acceptable when:
 - the vendor extension is refused gracefully by a non-supporting server — R-PROTO-053;
 - client implements `ivi.Transport`;
 - server compiles under the TinyGo profile;
+- client proven against an independent third-party server — R-DOC-060;
+- server proven against at least two independent third-party clients — R-DOC-061;
+- the version of every third-party implementation used is recorded — R-DOC-063;
 - third-party VISA interoperability is demonstrated.
 
 ## 64. Hardware
@@ -3374,6 +3445,13 @@ R19  upstream gotmc/hislip repository cannot     develop locally on the       §
      be created without the organisation owner   final module path            R-DOC-045
 R20  device-side packages acquire a non-TinyGo   import-graph test plus       §5.1.1
      dependency through routine maintenance      tinygo build in CI           R-DOC-030
+R21  own client and own server agree with each   independent implementations  §24.4
+     other but not with the standard             both ways; vectors first     R-DOC-071
+R22  no commercial instrument in the test set,   deferred not cancelled;      §24.4
+     so vendor deviations go unseen              three independent software   R-DOC-064
+                                                 implementations meanwhile
+R23  a third-party test implementation changes   record version or commit     §24.4
+     or becomes unavailable                      per release                  R-DOC-063
 ```
 
 [R-DOC-011] The risk register MUST be reviewed at each milestone exit. A risk MUST NOT be closed without either evidence that it did not materialise or a record of the response taken.
@@ -3426,6 +3504,8 @@ DOC     010-011      §1.1, §67             review
 DOC     020-021      §68                   review
 DOC     030-033      §5.1.1                §63
 DOC     040-046      §5.3                  review
+DOC     060-064      §24.4                 §63, §65
+DOC     070-072      Part IV               review
 ```
 
 ---
