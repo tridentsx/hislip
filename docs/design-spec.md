@@ -902,6 +902,20 @@ For the GPIB bridge, "the server application layer offers a response terminator"
 
 [R-SYNC-024] Response bytes already removed from the instrument MUST be discarded, not retained for a later transaction, when R-SYNC-021 applies. The bridge MUST NOT attempt to re-deliver them, because their MessageID association is void.
 
+The transaction is two messages, both from the server, in this order:
+
+```text
+step  sender  message            channel  control  parameter
+1     server  AsyncInterrupted   async    0        MessageID
+2     server  Interrupted        sync     0        MessageID
+```
+
+[R-SYNC-025] Both messages MUST carry, in the message parameter field, the MessageID of the `Data`, `DataEnd` or `Trigger` message that interrupted the server's response. This is the interrupting message, not the message whose response was discarded. Revision 2 did not state that these messages carry a MessageID at all.
+
+[R-SYNC-026] `AsyncInterrupted` SHOULD be sent before `Interrupted`, per the order of IVI-6.1 Table 30. A conforming client tolerates either order — it has defined behaviour for detecting each first — but following the table avoids exercising the less-travelled path in third-party clients.
+
+[R-SYNC-027] The control code of both messages MUST be zero. Neither carries a status or feature value.
+
 ### 11.4 MAV semantics
 
 MAV handling in the bridge shall be defined exclusively against Synchronized Mode.
@@ -3470,7 +3484,7 @@ PROTO   030          §4.3                  §63
 PROTO   040-041      §4.4                  §63
 PROTO   050-055      §17.4                 §63
 SYNC    010-014      §11.3.1               §63
-SYNC    020-024      §11.3.2               §63
+SYNC    020-027      §11.3.2               §63
 SYNC    030-033      §11.4.1               §63
 SRV     010-016      §13.1                 §63
 SRV     020-023      §16.4                 §63
