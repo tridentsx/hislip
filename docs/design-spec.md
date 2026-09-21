@@ -483,6 +483,8 @@ The firmware depends on TinyGo runtime behaviour that is version-sensitive, so t
 
 [R-FW-013] The firmware MUST NOT assume goroutine-to-core affinity. See §23.1.
 
+[R-FW-014] The `go` directive in `go.mod` MUST NOT exceed the Go language version supported by the pinned TinyGo release. TinyGo 0.42.0 supports Go 1.27, so a directive of `go 1.25.0` is compatible. This constraint is easy to violate accidentally, because raising the directive breaks only the firmware build while the host build continues to succeed.
+
 Release cadence is approximately one TinyGo minor release per four months, and patch releases are rare. The project MUST therefore be able to build from a pinned upstream commit or carry a local patch, and MUST NOT plan around an unreleased fix arriving on a schedule.
 
 Rationale for pinning rather than tracking latest: an instrument adapter has a long service life and a slow validation cycle. The cost of re-qualifying the firmware against a new toolchain exceeds the benefit of routine upgrades.
@@ -3400,7 +3402,7 @@ SRV     050-056      §47.2                 §65
 SRV     060-063      §20.1                 §63
 DEV     010-014      §17.3                 §63
 DEV     020-027      §38.1                 §63
-FW      010-013      §5.2                  §65
+FW      010-014      §5.2                  §65
 FW      020-025      §23.1                 §65
 FW      030-038      §40                   §65
 FW      039          §40                   §65

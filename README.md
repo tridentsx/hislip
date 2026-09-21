@@ -12,6 +12,9 @@ Early development. Milestone 0 of the design specification, the protocol codec,
 is implemented. The client, server and vendor extension packages are not yet
 written.
 
+The design specification is [docs/design-spec.md](docs/design-spec.md). Section
+references in the source comments, such as "§5.1", refer to it.
+
 This repository is not yet part of the `gotmc` organisation. It is developed
 against the final module path, `github.com/gotmc/hislip`, so that no import
 rewriting is needed when the upstream repository exists.
