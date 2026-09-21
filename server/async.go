@@ -7,6 +7,7 @@ package server
 
 import (
 	"context"
+	"time"
 
 	"github.com/gotmc/hislip/protocol"
 )
@@ -125,3 +126,87 @@ func (s *Server) RemoteLocal(
 	}
 	return protocol.Header{Type: protocol.AsyncRemoteLocalResponse}, nil
 }
+
+// Lock control codes carried by an AsyncLock message.
+const (
+	lockRelease uint8 = 0
+	lockRequest uint8 = 1
+)
+
+// Lock handles an AsyncLock message and returns the AsyncLockResponse to send.
+//
+// The lockString is the message payload interpreted as ASCII, which the caller
+// supplies separately because the payload is streamed rather than buffered. It is
+// meaningful only for a request; a zero-length string requests the exclusive lock.
+//
+// This is a class 0 operation. It needs no bus access, so it must be answered
+// even while a transfer is in progress, and it must not be placed on the bus
+// queue. IVI-6.1 is explicit that lock transactions complete even while a lock
+// held by another client blocks the synchronous channel. See R-SRV-040.
+//
+// The server always replies, whatever the outcome.
+func (s *Server) Lock(
+	ctx context.Context,
+	sess *Session,
+	h protocol.Header,
+	lockString string,
+) (protocol.Header, error) {
+	if h.Type != protocol.AsyncLock {
+		return protocol.Header{}, protocol.ErrUnknownMessageType
+	}
+	if err := sess.requireReady(); err != nil {
+		return protocol.Header{}, err
+	}
+
+	var result LockResult
+	switch h.Control {
+	case lockRequest:
+		// The 32-bit timeout in milliseconds travels in the message parameter,
+		// the field the standard otherwise calls MessageID.
+		timeout := time.Duration(h.Parameter) * time.Millisecond
+		result = s.locks.Request(ctx, sess.ID(), lockString, timeout)
+	case lockRelease:
+		result = s.locks.Release(sess.ID())
+	default:
+		return protocol.Header{}, ErrUnrecognizedControlCode
+	}
+
+	return protocol.Header{
+		Type:    protocol.AsyncLockResponse,
+		Control: uint8(result),
+	}, nil
+}
+
+// LockInfo handles an AsyncLockInfo message and returns the
+// AsyncLockInfoResponse.
+//
+// IVI-6.1 requires this transaction to be processed whether or not the client
+// holds a lock, so it does not consult the lock state for permission. The values
+// are sampled and may be stale by the time the client reads them, which the
+// standard also says; they need only be self-consistent at the moment of
+// sampling.
+func (s *Server) LockInfo(
+	sess *Session,
+	h protocol.Header,
+) (protocol.Header, error) {
+	if h.Type != protocol.AsyncLockInfo {
+		return protocol.Header{}, protocol.ErrUnknownMessageType
+	}
+	if err := sess.requireReady(); err != nil {
+		return protocol.Header{}, err
+	}
+
+	exclusive, holders := s.locks.Info()
+	var control uint8
+	if exclusive {
+		control = 1
+	}
+	return protocol.Header{
+		Type:      protocol.AsyncLockInfoResponse,
+		Control:   control,
+		Parameter: uint32(holders),
+	}, nil
+}
+
+// Locks returns the server's lock manager, for diagnostics and tests.
+func (s *Server) Locks() *LockManager { return &s.locks }

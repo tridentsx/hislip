@@ -24,6 +24,10 @@ type Server struct {
 	mu       sync.Mutex
 	sessions map[uint16]*Session
 	nextID   uint16
+
+	// locks is server-wide, not per-session: a lock exists to exclude other
+	// clients, so it cannot live inside the session it protects against.
+	locks LockManager
 }
 
 // New returns a server for the given device.
@@ -114,6 +118,11 @@ func (s *Server) removeSession(sess *Session) error {
 	if sess == nil {
 		return nil
 	}
+	// IVI-6.1 requires every lock held by a client to be released when its
+	// connection closes. A crashed client that kept its lock would leave the
+	// instrument indistinguishable from one legitimately in use.
+	s.locks.ReleaseAll(sess.id)
+
 	s.mu.Lock()
 	delete(s.sessions, sess.id)
 	s.mu.Unlock()
@@ -132,6 +141,7 @@ func (s *Server) CloseAll() error {
 
 	var firstErr error
 	for _, sess := range all {
+		s.locks.ReleaseAll(sess.id)
 		if err := sess.close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
