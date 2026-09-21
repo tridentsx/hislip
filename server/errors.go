@@ -25,6 +25,11 @@ var (
 	// does not exist or is already paired.
 	ErrInvalidSession = errors.New("hislip: unknown or already paired session ID")
 
+	// ErrInvalidInitSequence indicates the first message on a channel was not
+	// the one initialization requires: Initialize on the synchronous channel,
+	// AsyncInitialize on the asynchronous channel. It is fatal, code 3.
+	ErrInvalidInitSequence = errors.New("hislip: invalid initialization sequence")
+
 	// ErrInvalidSubAddress indicates an Initialize naming a sub-address this
 	// server does not serve.
 	ErrInvalidSubAddress = errors.New("hislip: unknown sub-address")
@@ -93,7 +98,8 @@ func WireErrorFor(err error) WireError {
 	switch {
 	case errors.Is(err, ErrSessionNotReady):
 		return WireError{Fatal: true, FatalCode: protocol.FatalChannelsNotEstablished}
-	case errors.Is(err, ErrInvalidSession), errors.Is(err, ErrInvalidSubAddress):
+	case errors.Is(err, ErrInvalidSession), errors.Is(err, ErrInvalidSubAddress),
+		errors.Is(err, ErrInvalidInitSequence):
 		return WireError{Fatal: true, FatalCode: protocol.FatalInvalidInitSequence}
 	case errors.Is(err, ErrMaxClients):
 		return WireError{Fatal: true, FatalCode: protocol.FatalMaxClientsExceeded}

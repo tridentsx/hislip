@@ -27,18 +27,10 @@ type Stream interface {
 // then rely on the timeout categories of §49 enforced at a higher layer, and it
 // cannot interrupt a read that is blocked in the transport. Implementations
 // SHOULD provide this where the underlying transport allows it.
+//
+// The channel loop will type-assert for this once it exists. Until then nothing
+// in this package calls SetDeadline, which is why there is no helper here yet.
 type DeadlineStream interface {
 	Stream
 	SetDeadline(t time.Time) error
-}
-
-// setDeadline applies a deadline when the stream supports one, and reports
-// whether it did. A false result is not an error; it means the caller must rely
-// on a higher-level timeout.
-func setDeadline(s Stream, t time.Time) bool {
-	ds, ok := s.(DeadlineStream)
-	if !ok {
-		return false
-	}
-	return ds.SetDeadline(t) == nil
 }
