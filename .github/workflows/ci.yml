@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "these files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./... -race -cover
+
+  fuzz:
+    name: fuzz smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # A short run on every change, not a campaign. The seed corpus alone finds
+      # nothing; the point is that the targets stay buildable and that an obvious
+      # regression in the decoder is caught before review rather than after.
+      # Milestone 0's exit criterion is that malformed network input cannot cause
+      # a large allocation or a panic, and this is what keeps checking it.
+      - name: fuzz the decoder and payload reader
+        run: |
+          for target in FuzzDecodeHeader FuzzReadPayload FuzzWriteMessage; do
+            echo "== $target =="
+            go test ./protocol -run '^$' -fuzz="^${target}$" -fuzztime=30s
+          done
+
+      # Any input that fails is written to testdata/fuzz and is worth keeping as a
+      # regression seed, so surface it rather than losing it with the runner.
+      - name: upload failing inputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-failures
+          path: protocol/testdata/fuzz/
+          if-no-files-found: ignore
+
+  device:
+    name: device-side build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # The import-graph test is the cause-level check: it names the offending file
+      # and import. The TinyGo build below is the consequence-level check, and
+      # catches anything the allowlist did not anticipate. R-DOC-030 and R-DOC-032
+      # require both, and this job is the only place the second one can run, since
+      # TinyGo is not generally installed on a development machine.
+      - name: import boundary
+        run: go test -run TestDeviceImportGraph -v .
+
+      - name: install tinygo
+        uses: acifani/setup-tinygo@v2
+        with:
+          tinygo-version: '0.42.0'
+
+      - name: tinygo version
+        run: tinygo version
+
+      # The RP2350 target. R-FW-011 requires the firmware to be correct under the
+      # default scheduler, so that is what is built here; the cores scheduler is an
+      # optimization that must be withdrawable.
+      - name: build device-side packages for RP2350
+        run: tinygo build -target=pico2 -o /dev/null ./protocol ./server
+
+      # R-FW-012: when multi-core is enabled it must still build. Kept separate so
+      # that a failure here does not look like a failure of the supported default.
+      - name: build with the cores scheduler
+        continue-on-error: true
+        run: tinygo build -target=pico2 -scheduler=cores -o /dev/null ./protocol ./server
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --config .golangci.yaml
+
+  interop:
+    name: interoperability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Conformance is established against implementations this project did not
+      # write; see interop/README.md. pyvisa-py and PyHiSLIP are cheap to install
+      # here. libhislip needs meson and ninja and is skipped rather than built,
+      # since its own send and receive paths are incomplete and it adds least.
+      - name: install pyvisa-py
+        run: python -m pip install --quiet pyvisa pyvisa-py
+
+      - name: run the interoperability suite
+        run: ./interop/run.sh
+        env:
+          VISA_PYTHON: python

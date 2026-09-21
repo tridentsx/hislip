@@ -101,6 +101,29 @@ during a transfer can stall a GPIB handshake, and a spurious handshake timeout
 presents to the user as a bus fault. The assertions are excluded from race
 builds, because the race detector allocates on its own account.
 
+## Interoperability
+
+Unit tests confirm the implementation does what its author intended. Only an
+independent implementation confirms the intention was right, so conformance is
+established against clients this project did not write:
+
+```sh
+./interop/run.sh
+```
+
+Three independent clients currently drive the example server — pyvisa-py,
+PyHiSLIP and `lxi-tools/libhislip` — for 32 checks with no failures. Clients that
+are not installed are skipped rather than failed.
+
+Between them they have found three defects that a full unit suite did not, and
+they settled the one open protocol question in the design specification: IVI-6.1
+Table 4 lists `DeviceClearAcknowledge` on the asynchronous channel, and two
+independent clients read it from the synchronous one, agreeing with the
+transaction description instead.
+
+Coverage, procedure, findings and the limitations of each client are recorded in
+[interop/README.md](interop/README.md).
+
 ## A defect in IVI-6.1
 
 Table 4 lists `DeviceClearAcknowledge`, message type 9, as an asynchronous
