@@ -82,6 +82,107 @@ type Session struct {
 
 	// opCancel abandons the in-flight bus operation. See Operation.
 	opCancel context.CancelFunc
+
+	// tx is the synchronized input/response transaction state.
+	tx Transaction
+
+	// syncW and asyncW write to the two channels. Each channel loop installs
+	// its own; a response needs both, because the Interrupted transaction spans
+	// them.
+	syncW  *MessageWriter
+	asyncW *MessageWriter
+
+	// pending reports whether a synchronous message has already arrived and is
+	// waiting. The synchronous channel loop installs it; it is the InputQueued
+	// predicate of the interrupted check.
+	pending func() bool
+
+	// program accumulates the current client program message, so that the
+	// response policy can inspect it whole. It is allocated once per session and
+	// reused.
+	program []byte
+}
+
+// Transaction returns the session's synchronized transaction state.
+func (s *Session) Transaction() *Transaction { return &s.tx }
+
+// SyncWriter returns the writer for the synchronous channel, or nil before it is
+// installed.
+func (s *Session) SyncWriter() *MessageWriter {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.syncW
+}
+
+// AsyncWriter returns the writer for the asynchronous channel, or nil before it
+// is installed.
+func (s *Session) AsyncWriter() *MessageWriter {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.asyncW
+}
+
+func (s *Session) setSyncWriter(w *MessageWriter) {
+	s.mu.Lock()
+	s.syncW = w
+	s.mu.Unlock()
+}
+
+func (s *Session) setAsyncWriter(w *MessageWriter) {
+	s.mu.Lock()
+	s.asyncW = w
+	s.mu.Unlock()
+}
+
+func (s *Session) setSyncPending(f func() bool) {
+	s.mu.Lock()
+	s.pending = f
+	s.mu.Unlock()
+}
+
+// syncPending returns the InputQueued predicate for this session. It never
+// returns nil: a session without a synchronous reader has no queued input, and
+// returning nil would be refused by Response.validate.
+func (s *Session) syncPending() func() bool {
+	s.mu.Lock()
+	f := s.pending
+	s.mu.Unlock()
+	if f == nil {
+		return func() bool { return false }
+	}
+	return f
+}
+
+// appendProgramMessage accumulates a chunk of the client's program message.
+//
+// The accumulated message exists so that the response policy can inspect the
+// whole thing. A policy cannot decide from a fragment: a query marker may fall in
+// any chunk, and a quoted string or binary block may straddle a boundary.
+func (s *Session) appendProgramMessage(p []byte) {
+	if len(p) == 0 {
+		return
+	}
+	s.mu.Lock()
+	if s.program == nil {
+		s.program = make([]byte, 0, s.maxRx)
+	}
+	// Bound the accumulation. A client that never terminates its program message
+	// must not be able to grow this without limit, which would be a denial of
+	// service on an unauthenticated port.
+	if uint64(len(s.program)+len(p)) <= s.maxRx {
+		s.program = append(s.program, p...)
+	}
+	s.mu.Unlock()
+}
+
+// takeProgramMessage returns the accumulated program message and resets the
+// accumulator, keeping its capacity.
+func (s *Session) takeProgramMessage() []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := s.program
+	s.program = s.program[:0]
+	return out
 }
 
 // newSession returns a session in StatePairing holding the synchronous channel.

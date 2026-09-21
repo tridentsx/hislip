@@ -49,6 +49,11 @@ type Config struct {
 	// Zero means the default.
 	MaxTxPayload uint64
 
+	// Policy decides whether a completed program message expects a response. It
+	// defaults to SCPIQueryPolicy. See §48 and the discussion of the generic
+	// GPIB-read problem in §17.
+	Policy ResponsePolicy
+
 	// VendorID is the two-character vendor identifier reported in
 	// AsyncInitializeResponse. It defaults to zero, meaning unidentified,
 	// because the project holds no IVI Foundation vendor ID yet; see

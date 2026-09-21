@@ -28,6 +28,12 @@ type Server struct {
 	// locks is server-wide, not per-session: a lock exists to exclude other
 	// clients, so it cannot live inside the session it protects against.
 	locks LockManager
+
+	// policy decides whether a completed program message expects a response.
+	policy ResponsePolicy
+
+	countersMu sync.Mutex
+	counters   Counters
 }
 
 // New returns a server for the given device.
@@ -43,9 +49,14 @@ func New(dev Device, cfg Config) (*Server, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
+	policy := cfg.Policy
+	if policy == nil {
+		policy = SCPIQueryPolicy{}
+	}
 	return &Server{
 		cfg:      cfg,
 		dev:      dev,
+		policy:   policy,
 		sessions: make(map[uint16]*Session),
 		nextID:   1,
 	}, nil

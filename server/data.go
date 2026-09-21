@@ -248,6 +248,42 @@ func (s *Server) SendResponse(
 	}
 }
 
+// Trigger handles a Trigger message.
+//
+// Trigger is a synchronous-channel message. It carries a MessageID from the same
+// counter as Data and DataEnd and it carries the RMT-delivered flag, so it takes
+// part in the interrupted check exactly as they do. That is why it must not
+// overtake queued data, and why it is a class 4 operation rather than a
+// high-priority one; see §47 and R-SRV-042.
+//
+// The returned Interrupted value is the silent RMT-mismatch error when non-zero.
+func (s *Server) Trigger(
+	ctx context.Context,
+	sess *Session,
+	tx *Transaction,
+	h protocol.Header,
+) (Interrupted, error) {
+	if h.Type != protocol.Trigger {
+		return NotInterrupted, protocol.ErrUnknownMessageType
+	}
+	if err := sess.requireReady(); err != nil {
+		return NotInterrupted, err
+	}
+
+	interrupted := sess.RMT().ReceivedSyncMessage(h.RMTDelivered())
+	sess.Status().ReceivedSyncMessage(h.MessageID())
+
+	// A trigger completes an input transaction in its own right: it is an
+	// end-of-message as far as the sequence is concerned.
+	if err := tx.CompleteInput(h.MessageID()); err != nil {
+		return interrupted, err
+	}
+	if err := s.dev.Trigger(ctx); err != nil {
+		return interrupted, err
+	}
+	return interrupted, tx.Complete()
+}
+
 // terminate writes the DataEnd that completes a response and updates the
 // Synchronized Mode state.
 func (s *Server) terminate(
