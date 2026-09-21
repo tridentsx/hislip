@@ -46,6 +46,11 @@ var (
 	// profile that does not support it. The server answers by returning
 	// Synchronized in the feature bitmap; this error is for internal accounting.
 	ErrUnsupportedMode = errors.New("hislip: requested mode not supported")
+
+	// ErrUnrecognizedControlCode indicates a control code the standard does not
+	// define for that message, such as a remote/local mode above 6. It is
+	// non-fatal, code 2.
+	ErrUnrecognizedControlCode = errors.New("hislip: unrecognized control code")
 )
 
 // Bridge-specific device-defined error codes, from the 128 to 255 range that
@@ -103,6 +108,8 @@ func WireErrorFor(err error) WireError {
 		return WireError{Fatal: true, FatalCode: protocol.FatalInvalidInitSequence}
 	case errors.Is(err, ErrMaxClients):
 		return WireError{Fatal: true, FatalCode: protocol.FatalMaxClientsExceeded}
+	case errors.Is(err, ErrUnrecognizedControlCode):
+		return WireError{Code: protocol.NonFatalUnrecognizedControlCode}
 	}
 	return WireError{Code: protocol.ErrorCodeFor(err)}
 }

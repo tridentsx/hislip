@@ -39,6 +39,11 @@ type Status struct {
 	// read out of the instrument into an adapter buffer. See §16.3.
 	responsePending bool
 
+	// srqLatched and srqStatus hold the bridge-side RQS latch. See
+	// LatchServiceRequest.
+	srqLatched bool
+	srqStatus  byte
+
 	started bool
 }
 
@@ -60,6 +65,8 @@ func NewStatus() *Status {
 func (s *Status) Reset() {
 	s.lastReceived = protocol.StatusQueryInitialMessageID
 	s.responsePending = false
+	s.srqLatched = false
+	s.srqStatus = 0
 	s.started = true
 }
 
@@ -90,6 +97,50 @@ func (s *Status) SetResponsePending(pending bool) {
 // ResponsePending reports whether the server holds response data.
 func (s *Status) ResponsePending() bool {
 	return s.responsePending
+}
+
+// LatchServiceRequest records a service request carrying the given status byte,
+// and reports whether it is a new event.
+//
+// A false result means one is already outstanding and this event coalesces into
+// it. That is not a memory optimisation but a protocol requirement: IVI-6.1
+// section 6.13 says no bit of the reported status register is cleared and the
+// client clears RQS by performing AsyncStatusQuery, so a further
+// AsyncServiceRequest must not be sent until it has. See R-SRV-023.
+func (s *Status) LatchServiceRequest(status byte) bool {
+	if s.srqLatched {
+		return false
+	}
+	s.srqLatched = true
+	s.srqStatus = status
+	return true
+}
+
+// ServiceRequestOutstanding reports whether a service request is awaiting
+// acknowledgement by an AsyncStatusQuery.
+func (s *Status) ServiceRequestOutstanding() bool {
+	return s.srqLatched
+}
+
+// ServiceRequestStatus returns the status byte captured when the outstanding
+// service request was latched.
+func (s *Status) ServiceRequestStatus() byte {
+	return s.srqStatus
+}
+
+// TakeServiceRequest reports whether a service request was outstanding and
+// clears the latch.
+//
+// The latch exists because a GPIB bridge must serial-poll the instrument to
+// discover why SRQ was asserted, and that poll may clear the instrument's own RQS
+// indication. Holding the bit on the HiSLIP side until the client asks preserves
+// the externally visible behaviour despite the bridge having consumed the
+// instrument's. See §16.2.
+func (s *Status) TakeServiceRequest() bool {
+	latched := s.srqLatched
+	s.srqLatched = false
+	s.srqStatus = 0
+	return latched
 }
 
 // MAV computes the message-available bit for an AsyncStatusQuery carrying

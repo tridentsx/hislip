@@ -6,6 +6,7 @@
 package server
 
 import (
+	"context"
 	"sync"
 
 	"github.com/gotmc/hislip/protocol"
@@ -78,6 +79,9 @@ type Session struct {
 
 	maxRx uint64
 	maxTx uint64
+
+	// opCancel abandons the in-flight bus operation. See Operation.
+	opCancel context.CancelFunc
 }
 
 // newSession returns a session in StatePairing holding the synchronous channel.
@@ -223,7 +227,13 @@ func (s *Session) close() error {
 	streams := []Stream{s.sync, s.async}
 	s.sync, s.async = nil, nil
 	s.state = StateClosed
+	cancel := s.opCancel
+	s.opCancel = nil
 	s.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
 
 	var firstErr error
 	for _, st := range streams {
@@ -235,4 +245,42 @@ func (s *Session) close() error {
 		}
 	}
 	return firstErr
+}
+
+// Operation returns a context for a bus operation, together with the function
+// that releases it.
+//
+// The returned context is cancelled when the operation completes, when the
+// session closes, or when a Device Clear abandons the operation. That last case
+// is the mechanism behind R-SRV-016: a Device Clear that cannot interrupt a stuck
+// instrument is useless, because a stuck instrument is the condition an operator
+// issues one for.
+//
+// Only one operation may be outstanding per session, which the serialized bus
+// engine of §46 guarantees. Registering a second replaces the first, so a leaked
+// operation cannot make a later Device Clear abort the wrong work.
+func (s *Session) Operation(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+	s.mu.Lock()
+	s.opCancel = cancel
+	s.mu.Unlock()
+	return ctx, func() {
+		s.mu.Lock()
+		if s.opCancel != nil {
+			s.opCancel = nil
+		}
+		s.mu.Unlock()
+		cancel()
+	}
+}
+
+// abortOperation cancels the in-flight bus operation, if any.
+func (s *Session) abortOperation() {
+	s.mu.Lock()
+	cancel := s.opCancel
+	s.opCancel = nil
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
 }
