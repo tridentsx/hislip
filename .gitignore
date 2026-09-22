@@ -52,11 +52,45 @@ hardware/gerbers/
 *.gbr
 *.drl
 
+# easyeda2kicad API response cache. Regenerated on demand; the generated symbol
+# and footprint libraries under hardware/lib/ are what must be tracked.
+.easyeda_cache/
+
 # Local working notes, not part of the deliverable. The session handover lives
 # here so that it can be candid about unfinished work without that becoming part
 # of the project's public record.
 *.local.md
 HANDOVER*.md
+
+# Generated netlist export. `kicad-cli sch export netlist` writes this and
+# scripts/netlist-check.py consumes it; the schematic is the source of truth, so a
+# checked-in netlist could only ever go stale and disagree with it.
+build/
+
+# Schematic renders produced by kicad-cli / Konnect for review. Regenerate rather
+# than commit, for the same reason as the Gerbers above.
+hardware/*.png
+hardware/*.svg
+
+# VSCode "Local History" extension working directory. It shadows every sheet on
+# each save and contains its own nested .git, which would otherwise be committed
+# as a gitlink and confuse anyone who cloned this.
+.history/
+
+# 3D models (.step/.wrl). Deliberately NOT tracked: they are ~57 MB of
+# third-party mechanical assets, and git history is append-only, so committing
+# them is effectively irreversible. Nothing in the netlist or the ERC gate depends
+# on them; they matter for enclosure fit and for measuring part height (the
+# DP9900LPB 8.0 mm figure in netlist-spec.md 4.1 came from its model).
+#
+# To restore them:
+#   easyeda2kicad --full --lcsc_id=<C-number> --output hardware/lib/adapter
+#     for each C-number in netlist-spec.md 4.3, and
+#   re-clone the GPIB library at the commit in
+#     hardware/lib/third-party/gpib-kicad-library/UPSTREAM_COMMIT
+# Drop these two lines if you would rather carry them in-tree.
+hardware/lib/adapter.3dshapes/
+hardware/lib/third-party/gpib-kicad-library/3dmodels/
 
 # Local scratch backup of the Revision 2 spec, superseded by git history
 .gotmc-hislip-poe-gpib-design-spec-rev2.bak

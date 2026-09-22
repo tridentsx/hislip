@@ -130,8 +130,8 @@ Circuit:
 
 | Ref | Part (LCSC) | Role |
 |---|---|---|
-| **U5** | LDO 5V→3.3V, AP2114H-3.3TRG1, SOT-223 (**C166063**); alt AMS1117-3.3 (**C6186**) | `+5V_POE → +3V3`, ≥1 A ≫ the ~180 mA load (§3.3) |
-| **U6** | Supervisor, SOT-23-3, `VIT-` ≈ 3.0–3.08 V, active-low push-pull RESET (APX809-31 / RT9818-31 family — confirm threshold suffix on LCSC) | Emits **3V3-good** (RESET high when +3V3 ≥ threshold) |
+| **U5** | LDO 5V→3.3V, AP2114H-3.3TRG1, SOT-223 (**C150716**); alt AMS1117-3.3 (**C6186**) | `+5V_POE → +3V3`, ≥1 A ≫ the ~180 mA load (§3.3) |
+| **U6** | Supervisor **TPS3839G33DBZR**, SOT-23-3 (**C485802** ✔), `VIT-` = 3.003/**3.08**/3.126 V, `Vhys` 31 mV, **push-pull** active-low RESET | Emits **3V3-good** (RESET high when +3V3 ≥ threshold) |
 | **Q1** | AO3401 P-FET, SOT-23 (**C15127**), −30 V, `Vgs(th)` ≈ −1.1 V | High-side switch `+5V_POE → +5V_XCVR` |
 | **Q2** | 2N7002 N-FET, SOT-23 (**C8545**) | Level-shifts 3V3-good to the 5 V-referenced Q1 gate; allows full turn-off |
 | **R_G1** | 100 kΩ, gate→+5V_POE | Default **off** (Q1 gate pulled to source) |
@@ -143,6 +143,31 @@ Chain: **+3V3 ≥ 3.08 V → U6 RESET high → Q2 on → Q1 gate pulled low → 
 holds Q1 off, `+5V_XCVR` is dead — the transceivers cannot drive the FT pads or
 the bus. This is the sequencing `R-HW-020` requires, built from a P-FET the way
 you asked, with the "3V3-good" threshold (not mere presence) coming from U6.
+
+**U6 = TPS3839G33DBZR (C485802), verified against SBVS193D.** Its `RESET` is
+**push-pull**, so `PG_3V3` needs no pull-up and `R_G2` remains the sole fail-safe;
+an open-drain supervisor would have required a pull-up whose rail choice is itself
+a hazard (a pull-up to +5V would assert 3V3-good with no +3V3 present). `VIT-` =
+3.003 / 3.08 / 3.126 V against the AP2114H's ±1.5 % band (3.25–3.35 V) leaves
+≈124 mV between `VIT-`max and the rail's minimum, so the gate cannot chatter.
+
+**Defect found while drawing the schematic (2026-09-21): `C_G` must return to
++5V_POE, not to GND.** The machine-readable table in `docs/netlist-spec.nets`
+listed `C_G.2` on `GND` while the row above puts C_G "gate→+5V_POE". Those are
+not interchangeable. A gate-to-GND capacitor holds the gate near 0 V while
+`+5V_POE` rises, so `Vgs` follows the rail down to about −5 V and **Q1 turns on**
+during the ramp — powering the transceivers with IOVDD absent, the exact
+condition `R-HW-020` exists to prevent. Referenced to the source instead, C_G
+holds `Vgs ≈ 0` (off) through the rail's rise and, with `R_G1`, sets the
+turn-on ramp. The schematic follows this row; the net table has been corrected
+to match, and `scripts/netlist-check.py` now fails if C_G is moved back.
+
+**Consequence for the boot sequence (§41, `R-FW-110`):** the TPS3839 holds RESET
+asserted for a further **≈200 ms** after +3V3 crosses `VIT- + Vhys`, so
+`+5V_XCVR` — and therefore U3/U4 — is unpowered for roughly the first 200 ms of
+board life. Firmware MUST NOT assume the transceivers are powered at reset; this
+strengthens rather than weakens `R-HW-020`, but it is a timing fact the firmware
+bring-up has to expect.
 
 Why not a single integrated-PG LDO: the clean LCSC part (LM9076, LDO + delayed
 reset) is rated **150 mA**, below the ~180 mA the W5500-dominated 3.3 V rail draws,
@@ -204,6 +229,8 @@ housekeeping ≈ **≈ 0.44 A → 2.2 W**, +25 % margin ≈ **0.55 A → 2.75 W*
 **Against the sources:** WIZPoE-P1 rated 5 V / **8 W typ (≈ 1.6 A)** → load is
 28–34 %, margin > 3×. 802.3af guarantees **12.95 W at the PD**; input ≈ 2.2 W ÷ 0.80
 ≈ **2.75 W** typical (≈ 3.4 W worst-case) → **Class 1 (≤ 3.84 W)**, margin > 3×.
+M1's class is programmable, so the board can declare Class 1 and a PSE reserves
+only that much rather than a module's full rating.
 
 **Inrush / bulk (`R-HW-051`):** `C_BULK` 47 µF on `+5V_POE` (hold-up through the
 `+5V_XCVR` turn-on step); `+5V_XCVR` local bulk 2 × 4.7 µF + 2 × 100 nF, charged
@@ -223,16 +250,17 @@ release; representative 0805 basic-part numbers are given for common values.
 | Ref | Part | Package | LCSC | Function |
 |---|---|---|---|---|
 | **U1** | Raspberry Pi **RP2354A** | QFN-60 | **C41378174** | MCU, 2 MB internal flash (no external QSPI) |
-| **U2** | WIZnet **W5500** | LQFP-48 | C32843 *(verify)* | Hardwired TCP/IP + 10/100 PHY |
-| **U3** | TI **SN75160BDW** | SOIC-20 | *(verify; family C139410)* | GPIB data transceiver (DIO1–8) |
-| **U4** | TI **SN75161BDW** | SOIC-20 | **C139410** *(verify 160/161)* | GPIB management transceiver |
-| **U5** | Diodes **AP2114H-3.3TRG1** | SOT-223 | **C166063** | 5 V→3.3 V LDO, 1 A (alt AMS1117-3.3, C6186) |
-| **U6** | Supervisor, `VIT-`≈3.0–3.08 V, active-low push-pull | SOT-23-3 | APX809-31 / RT9818-31 *(verify)* | 3V3-good signal |
+| **U2** | WIZnet **W5500** | LQFP-48 | **C32843** ✔ | Hardwired TCP/IP + 10/100 PHY |
+| **U3** | TI **SN75160BDW** | SOIC-20 | *(number to source)* | GPIB data transceiver (DIO1–8). Symbol/footprint from KiCad stock: `Interface:SN75160BDW` + `Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm` |
+| **U4** | TI **SN75161BDW** | SOIC-20 | **C139410** ✔ | GPIB management transceiver (C139410 is the **161**, confirmed) |
+| **U5** | Diodes **AP2114H-3.3TRG1** | SOT-223 | **C150716** ✔ | 5 V→3.3 V LDO, 1 A (alt AMS1117-3.3, **C6186** ✔). **Not C166063** — see §4.3 |
+| **U6** | TI **TPS3839G33DBZR** (`VIT-` 3.08 V typ, push-pull) | SOT-23-3 | **C485802** ✔ | 3V3-good signal. Pins: 1 GND, 2 `RESET`, 3 VDD |
 | **Q1** | Alpha&Omega **AO3401** | SOT-23 | **C15127** | P-FET high-side gate |
 | **Q2** | **2N7002** | SOT-23 | **C8545** | N-FET level-shift |
-| **M1** | WIZnet **WIZPoE-P1** | module | — (WIZnet) | Isolated 802.3af PD → +5V_POE |
-| **J1** | **FUYCONN FUY57139-24P** (M3.5); alt NorComp 112-024-113R001 | IEEE-488 24-pin R/A male TH | *(distributor)* | Instrument connector |
-| **J2** | PoE MagJack **AR11-3757I / AR11-4310IR** (802.3af, centre-tap access) | RJ45 int. magnetics | **C7217089** | Ethernet + PoE tap |
+| **M1** | PoE PD front-end — SDAPO **DP9900LPB-5V1.4A**, isolated PD module + DC-DC, 36–57 V in, 5 V/1.4 A (7 W) out, 1500 V I/O isolation, **programmable power class**. Bridges are **not** included — see D_BR1/D_BR2 | SMD, **21.2 × 13.9 × 8.0 mm** (verified from the part's 3D model) | **C53065982** ✔ *(specs/geometry verified; stock not verified)* | Isolated 802.3af PD → +5V_POE. Pins: 1 +VDC → +5V_POE, 2 −VDC → GND, 3 ADJ (unused), 4 VIN+, 5 VIN− ← bridge outputs. Dimension- and pin-compatible with **Silvertel Ag9905-LPB** (second source) |
+| **D_BR1, D_BR2** | MCC **MB6S-TP** bridge rectifier ×2, 600 V / 0.5 A | MBS (SOIC-4), 4.7 × 4.0 × 2.5 mm | **C85619** ✔ | Rectify each pair set for M1's VIN±: D_BR1 = Alternative A (RJ45 1&2, 3&6 taps), D_BR2 = Alternative B (4&5, 7&8). ~60 mA at 48 V against a 0.5 A rating; 600 V PIV is generous over 57 V + surge |
+| **J1** | **NorComp 112-024-113R001** — Centronics-24 (IEEE-488) **male**, right-angle PCB; alt FUYCONN FUY57109A | 24-way THT, 2 × 12 on 2.16 mm pitch, 4.29 mm rows, 2 × 3.1 mm holes on 46.8 mm | *(distributor; not an LCSC line)* | Instrument connector, **direct plug** into the instrument's female port. Symbol `Connector_GPIB:Conn_GPIB_L-com_CIB24SRA` (pinout is gender-independent); footprint `adapter:CONN_112-024-113R001_NRC`, **verified** — see §4.4 item 2 |
+| **J2** | PoE MagJack — candidate **USAKRO DGUK411Q211DB2A1DP2** (2.5G PoE+, 4-pair, 4 × CT + VC1–VC4) | RJ45 TH int. magnetics | **C19725138** ⚠ *(pin function unconfirmed — see §4.4)* | Ethernet + PoE tap |
 | **J3** | USB-C receptacle **TYPE-C-31-M-12** | 16-pin SMD | **C165948** | USB (flash + CDC diag) |
 | **X1** | **12 MHz** crystal, Abracon **ABM8-272-T3** (RP-recommended), 10 pF, ≤50 Ω ESR | 3.2×2.5 mm | *(verify; LCSC 12 MHz alt)* | RP2354 clock |
 | **X2** | **25 MHz** crystal (W5500), ±30 ppm | 3.2×2.5 mm | *(verify)* | W5500 clock |
@@ -240,37 +268,305 @@ release; representative 0805 basic-part numbers are given for common values.
 
 ### 4.2 Passives and discretes (0805 minimum)
 
+**Designator convention.** KiCad treats a reference with no trailing digit as
+*unannotated*, and an annotate pass in eeschema would silently rename such parts
+— breaking the correspondence between the schematic and this document. Every
+designator therefore carries a numeric suffix in the schematic and in
+`netlist-spec.nets`: `R_TE1`, `C_G1`, `TP_5V1`, `C_U3a1`, and so on. This
+section's tables name the parts without the suffix for readability; the suffixed
+form is the authoritative one.
+
 | Ref(s) | Value | LCSC (representative) | Purpose |
 |---|---|---|---|
-| C_BULK | 47 µF, 16 V | C2011903 (0805/1206) *(verify)* | +5V_POE bulk / hold-up (`R-HW-051`) |
-| C_U3a, C_U4a | 100 nF ×2 | C49678 | VCC bypass at U3/U4 |
-| C_U3b, C_U4b | 4.7 µF ×2 | C1779 (0805) | +5V_XCVR local bulk |
-| C6, C7, C9 | 4.7 µF ×3 | C1779 | RP2354 core reg in/out (per RP minimal) |
-| C_1V2 | 4.7 µF | C1779 | W5500 1V2O (datasheet-mandated) |
-| C_ANA | 10 nF | C1710 *(verify)* | W5500 analog cap (datasheet-mandated) |
-| C_MCU × n | 100 nF each | C49678 | RP2354 IOVDD/DVDD decoupling (per RP minimal) |
-| C_ETH × n | 100 nF each | C49678 | W5500 AVDD/VDD decoupling |
-| C_X1a/b | 15 pF ×2 | C1644 *(verify)* | X1 (12 MHz) load caps |
+| C_BULK | 47 µF, 16 V | C2011903 ✘ *(is a 16 MHz oscillator — reselect)* | +5V_POE bulk / hold-up (`R-HW-051`) |
+| C_U3a, C_U4a | 100 nF ×2 | C49678 ✔ | VCC bypass at U3/U4 |
+| C_U3b, C_U4b | 4.7 µF ×2 | C1779 ✔ (0805) | +5V_XCVR local bulk |
+| C6, C7, C9 | 4.7 µF ×3 | C1779 ✔ | RP2354 core reg in/out (per RP minimal) |
+| C_1V2 | 4.7 µF | C1779 ✔ | W5500 1V2O (datasheet-mandated) |
+| C_ANA | 10 nF | C1710 ✔ (0805) | W5500 analog cap (datasheet-mandated) |
+| C_MCU × n | 100 nF each | C49678 ✔ | RP2354 IOVDD/DVDD decoupling (per RP minimal) |
+| C_ETH × n | 100 nF each | C49678 ✔ | W5500 AVDD/VDD decoupling |
+| C_X1a/b | 15 pF ×2 | C1644 ⚠ *(value right, **0603** — breaks the 0805 rule)* | X1 (12 MHz) load caps |
 | C_X2a/b | per X2 spec | *(verify)* | X2 (25 MHz) load caps |
-| C_3V3 | 1 µF | C28323 | +3V3 local bypass |
-| C_LDO | 1 µF in + 1 µF out | C28323 | U5 in/out (AP2114H) |
-| RSET | 12.4 kΩ 1% | C218478 *(verify)* | W5500 EXRES1 → AGND |
-| R_G1 | 100 kΩ | C149161 | Q1 gate pull-up → +5V_POE |
-| R_G2 | 100 kΩ | C149161 | Q2 gate pull-down → GND |
-| C_G | 100 nF | C49678 | Q1 gate soft-start |
-| R_TE | 10 kΩ | C17414 | TE pull-down → GND (`R-HW-040`) |
-| R_DC | 10 kΩ | C17414 | DC pull-up → +3V3 (`R-HW-040`) |
-| R_ATN,R_REN,R_IFC,R_SRQ | 10 kΩ ×4 | C17414 | de-assert bias → +3V3 (`R-HW-040`/`041`) |
-| R_CFG | 10 kΩ | C17414 | CFG (GPIO28) defined state (`R-HW-065`) |
-| R_CC1, R_CC2 | 5.1 kΩ ×2 | C23186 | USB-C CC pull-downs (device role) |
-| R_PE | 0 Ω (opt pad) | C17168 | U3 PE→+5V_XCVR (3-state, §29) |
-| R_RUN, R_BOOT | 10 kΩ ×2 | C17414 | RUN pull-up / BOOTSEL (per RP minimal) |
+| C_3V3 | 1 µF | C28323 ✔ | +3V3 local bypass |
+| C_LDO | 1 µF in + 1 µF out | C28323 ✔ | U5 in/out (AP2114H) |
+| RSET | 12.4 kΩ 1% | C218478 ✘ *(is 287 Ω — reselect)* | W5500 EXRES1 → AGND |
+| R_G1 | 100 kΩ | C149161 ✘ *(no such part — reselect)* | Q1 gate pull-up → +5V_POE |
+| R_G2 | 100 kΩ | C149161 ✘ *(no such part — reselect)* | Q2 gate pull-down → GND |
+| C_G | 100 nF | C49678 ✔ | Q1 gate soft-start |
+| R_TE | 10 kΩ | C17414 ✔ | TE pull-down → GND (`R-HW-040`) |
+| R_DC | 10 kΩ | C17414 ✔ | DC pull-up → +3V3 (`R-HW-040`) |
+| R_ATN,R_REN,R_IFC,R_SRQ | 10 kΩ ×4 | C17414 ✔ | de-assert bias → +3V3 (`R-HW-040`/`041`) |
+| R_CFG | 10 kΩ | C17414 ✔ | CFG (GPIO28) defined state (`R-HW-065`) |
+| R_CC1, R_CC2 | 5.1 kΩ ×2 | C23186 ⚠ *(value right, **0603**)* | USB-C CC pull-downs (device role) |
+| R_PE | 0 Ω (opt pad) | C17168 ⚠ *(value right, **0402**)* | U3 PE→+5V_XCVR (3-state, §29) |
+| R_RUN, R_BOOT | 10 kΩ ×2 | C17414 ✔ | RUN pull-up / BOOTSEL (per RP minimal) |
 | SW_RUN, SW_BOOT | tact | *(verify)* | reset / BOOTSEL buttons |
-| LED1 (+R_LED) | status LED + 1 kΩ | C2286 / C17513 | status LED (`R-HW-064`), on a GPIO |
-| R_SH / C_SH | 0 Ω / RC (opt) | C17168 | connector shield → chassis (§31) |
+| LED1 (+R_LED) | status LED + 1 kΩ | C2286 ⚠ *(**0603** LED)* / C17513 ✔ | status LED (`R-HW-064`), on a GPIO |
+| R_SH / C_SH | 0 Ω / RC (opt) | C17168 ⚠ *(**0402**)* | connector shield → chassis (§31) |
 | TP_* | test pads | — | TE,DC,ATN,DAV,NRFD,NDAC,SRQ,IFC,5V,3V3,GND (§32) |
 
+### 4.3 LCSC verification log (2026-09-21)
+
+Every number above was queried against the EasyEDA/LCSC component API before any
+symbol was pulled; `✔` means the API returned the expected manufacturer part and
+an 0805-or-larger package, `⚠` the right value in a package smaller than the
+§0.4 hand-assembly rule, `✘` a number that does not describe the intended part at
+all. Seven of the twenty checked were wrong, so **no number in this document may
+be trusted without a query** — including the ones that were never marked *(verify)*.
+
+| Number | Spec claimed | API returned | Verdict |
+|---|---|---|---|
+| C41378174 | RP2354A | RP2354A, QFN-60 | ✔ |
+| C32843 | W5500 | W5500, LQFP-48 | ✔ |
+| C139410 | SN75161BDW (160/161 unsure) | SN75161BDW, SOIC-20 | ✔ — it is the **161** |
+| C166063 | AP2114H-3.3TRG1 | **SK1117-1.5** (SHIKUES), a **1.5 V** LDO | ✘ **wrong rail** |
+| C150716 | — | AP2114H-3.3TRG1 (Diodes), SOT-223 | ✔ **use this for U5** |
+| C53065982 | — | DP9900LPB-5V1.4A (SDAPO), 5 V/1.4 A PD module, 21.2 × 13.9 × **8.0 mm** from its 3D model | ✔ **use this for M1** |
+| C53065979 | — | DP9900MTB-5V1.8A, same footprint, 13.4 mm tall | ⚠ rejected on height |
+| C53065972 | — | DP1425-5V1.8A, bridges included, single-row edge-mount SIP | ⚠ rejected: height undocumented |
+| C85619 | — | MB6S-TP (MCC), 600 V/0.5 A bridge, MBS 4.7 × 4.0 mm | ✔ **use this for D_BR1/D_BR2** |
+| C6186 | AMS1117-3.3 (alt) | AMS1117-3.3, SOT-223 | ✔ |
+| C15127 | AO3401 | AO3401A, SOT-23 | ✔ |
+| C8545 | 2N7002 | 2N7002, SOT-23 | ✔ |
+| C165948 | TYPE-C-31-M-12 | TYPE-C-31-M-12 | ✔ |
+| C7217089 | AR11-3757I MagJack | *not in catalogue* | ✘ |
+| C485802 | — | TPS3839G33DBZR (TI), SOT-23-3, `VIT-` 3.08 V, push-pull | ✔ **use this for U6** |
+| C19725138 | — | DGUK411Q211DB2A1DP2 (USAKRO), 2.5G PoE+ RJ45 TH, 22 pins | ⚠ **J2 candidate**, pinout unconfirmed |
+| C49678 | 100 nF | CC0805KRX7R9BB104, 0805 | ✔ |
+| C17414 | 10 kΩ | 0805W8F1002T5E, 0805 1 % | ✔ |
+| C1779 | 4.7 µF | CL21A475KAQNNNE, 0805 | ✔ |
+| C28323 | 1 µF | CL21B105KBFNNNE, 0805 | ✔ |
+| C1710 | 10 nF | CL21B103KBANNNC, 0805 | ✔ |
+| C17513 | 1 kΩ | 0805W8F1001T5E, 0805 | ✔ |
+| C23186 | 5.1 kΩ | 0603WAF5101T5E, **0603** | ⚠ |
+| C17168 | 0 Ω | 0402WGF0000TCE, **0402** | ⚠ |
+| C1644 | 15 pF | CL10C150JB8NNNC, **0603** | ⚠ |
+| C2286 | status LED | KT-0603R, **0603** | ⚠ |
+| C218478 | 12.4 kΩ 1 % | ARG05FTC2870 = **287 Ω** | ✘ |
+| C2011903 | 47 µF 16 V | 653L16003C2T = **16 MHz oscillator** | ✘ |
+| C149161 | 100 kΩ | *not found* | ✘ |
+
+**The C166063 error was the dangerous one.** It was recorded as confirmed, not
+*(verify)*, and it would have put a **1.5 V** regulator on the rail that feeds
+IOVDD, every bias network and the W5500 — the board would not run, and the
+`R-HW-020` gate precondition ("+3V3 ≥ 3.08 V") could never be met. Correct part:
+**C150716**.
+
+Still to source before the BOM is releasable: U3 (SN75160BDW), J1 (IEEE-488
+connector), X1/X2 (12 MHz / 25 MHz crystals), L1 (3.3 µH), C_BULK (47 µF), RSET
+(12.4 kΩ 1 %), R_G1/R_G2 (100 kΩ), and 0805 replacements for the four `⚠` parts.
+The schematic can be authored ahead of these: U3 has a stock KiCad symbol, J1 has
+an authored one, and the rest are generic `Device:` symbols whose footprint
+assignment is the only thing that waits on the number.
+
+### 4.4 Open hardware questions (blocking the Ethernet/PoE sheet)
+
+**1. The PD front-end is now specified: SDAPO DP9900LPB-5V1.4A (C53065982) plus
+two MB6S bridges (C85619).** Revision 2 delegated the whole 802.3af
+powered-device function to the WIZPoE-P1, a WIZnet accessory for WIZnet's own
+boards, now withdrawn. The replacement covers every function the standard
+requires of a PD, but it is worth being precise about where each one lives,
+because the module's own marketing is easy to misread:
+
+- **inside M1**: the 25 kΩ detection signature, the classification current
+  signature (programmable class), inrush and operating current limit, the
+  hot-swap switch, 1500 V galvanic isolation, and the 48 V → 5 V conversion;
+- **outside M1, ours to provide**: the **bridge rectifiers**. The DP9900 series
+  presents `VIN+`/`VIN−` as *Direct Input* pins that, per its pin table,
+  "connect to the … output of the input bridge rectifiers" — i.e. the bridges
+  are external. D_BR1 and D_BR2 supply them, one per pair set, so the board
+  accepts Alternative A and B feeds in either polarity.
+
+The isolation living inside M1 is not an optimisation: the IEEE-488 shell bonds
+to the instrument chassis and J3 is a second external interface, so the barrier
+must sit upstream of board ground.
+
+**Why this part.** It was selected on **height**, which is what a dongle
+enclosure actually constrains — not footprint area, as an earlier revision of
+this section wrongly implied. Verified from the part's own 3D model at
+**21.2 × 13.9 × 8.0 mm**, matching Silvertel's published 21 × 14 × 8 mm for the
+equivalent Ag9900LPB. The alternatives measured or reported as: DP9900MTB
+(C53065979) 21.2 × 13.9 × **13.4 mm**, same footprint, 5.4 mm taller; DP1425
+(C53065972) bridges-included but a single-row edge-mount SIP whose height is
+documented only as a drawing, hence unverifiable and plausibly 15–25 mm. 8.0 mm
+is about the height of the IEEE-488 connector body, so M1 fits under the same lid
+rather than setting it.
+
+Being dimensionally and functionally interchangeable with **Silvertel
+Ag9905-LPB** gives a second source, which matters on a board that already
+carries an EOL risk for U3/U4 (design-spec.md §67, R24).
+
+7 W against the §3.3 load of 2.75 W is 2.5× margin, and the programmable class
+means the board can declare Class 1 rather than reserving a PSE's full budget.
+
+**The documented path to smaller and cheaper** is MPS **MP8017**: an 802.3af PD
+interface (detection, classification, inrush and operating current limit, 100 V
+hot-swap MOSFET) *plus* an active-clamp primary-side-regulation flyback
+controller in a QFN-19 3 × 4 mm, with an MPS 5 V reference design
+(EVL8017-L-00B). It is the right answer for a volume revision or if 8 mm is ever
+too tall, at the cost of owning the transformer selection, the isolation-barrier
+layout and the EMC — risk that buys nothing on a v1 whose purpose is proving the
+protocol stack.
+
+**Stock is unverified** for both M1 and the bridges: specifications, geometry and
+pinouts were read from datasheets, the LCSC/EasyEDA catalogue and the parts' own
+3D models, none of which report inventory. Confirm availability before release.
+
+**2. J1's gender is settled: male, and the adapter is a direct-plug dongle.**
+J1 is a **FUYCONN FUY57109A**, Centronics-24 male, right-angle PCB mount, which
+plugs straight into the instrument's female GPIB port — the form the original
+specification intended and the one commercial GPIB-Ethernet adapters take.
+
+Two consequences follow.
+
+*The vendored footprint cannot be used.* `gpib-kicad-library` supplies L-com
+**female** receptacles only. Male and female pad numbering are mirror images, so
+building on the female pattern would put every DIO line on the wrong pin — the
+one error on this sheet that produces a board which looks right and is
+electrically scrambled. J1's footprint is therefore **deliberately unassigned**
+until FUYCONN's PCB drawing for this part is in hand. The symbol is unaffected:
+the IEEE-488 pinout is gender-independent, and it was cross-checked against §5.4
+pin for pin.
+
+*Height is the binding enclosure constraint.* A dongle hangs off the instrument's
+port, so the lid clearance is set by the tallest part, not by board area. This is
+what selected the 8.0 mm DP9900LPB over the 13.4 mm MTB in item 1.
+
+**J1's footprint is now resolved: `adapter:CONN_112-024-113R001_NRC`.** The part is
+a **NorComp 112-024-113R001**, the male alternate this specification already
+named, and its vendor-supplied KiCad footprint was measured before adoption:
+
+- 24 through-hole pads, 0.99 mm drill, **pins 1–12 on one row and 13–24 on the
+  other** — the IEEE-488 row split, not a header's alternating order;
+- **2.16 mm** pitch along each row, rows **4.29 mm** apart;
+- two non-plated **3.1 mm** mounting holes at x = −11.52 and +35.28, a
+  **46.8 mm** span;
+- courtyard present; no 3D model supplied.
+
+Those numbers agree with the vendored L-com female footprint, and the two are
+**mirror images** of each other: the NorComp male runs pin 1 → 12 in increasing x
+with holes at −11.52/+35.28, the L-com female runs 1 → 12 in decreasing x with
+holes at −35.28/+11.52. Two vendors, two independently sourced files, agreeing on
+the grid and differing exactly by the mirror the gender change predicts. That is
+the check that the earlier revision of this section said was required, and it is
+now satisfied by measurement rather than assumption.
+
+The generic `PinHeader_2x12_P2.54mm_Horizontal` placeholder that occupied this
+slot has been replaced; nothing in the design references it any more.
+
+FUYCONN FUY57109A remains recorded as the alternate, but **its footprint has not
+been verified** — the vendor's PCB drawing was not obtainable — so substituting
+it requires repeating the measurement above.
+
+**3. J2 centre-tap mapping — CLOSED 2026-09-22 by documentation.**
+
+Resolved from the connector's own datasheet (LCSC C19725138, Dongguan Usakro,
+sheet 3) and the WIZnet WIZPoE-P1 datasheet; no ring-out needed.
+
+The connector drawing labels its two columns "PCB SIDE TO PHY" and "CABLE SIDE",
+and the cable side carries `J1 TX1+` .. `J8 TX4-`, i.e. the eight RJ45 contacts.
+The turns-ratio notes give every transformer as `1CT:1CT`, so both windings have
+centre taps: the four `CT` pins (1, 6, 7, 12) are the **PHY-side** taps and
+`VC1`-`VC4` (13-16) are the **cable-side** taps, which is where PoE is extracted.
+Note 8 confirms the part is 802.3at magnetics "for PSE or PD applications", rated
+720 mA / 57 V DC continuous.
+
+The WIZPoE-P1 datasheet pin table fixes the Alternative mapping outright:
+
+| Module pin | Connects to the centre tap of | Alternative |
+|---|---|---|
+| `VC1 (+)` | the pair on RJ45 **1 & 2** | A |
+| `VC1 (-)` | the pair on RJ45 **3 & 6** | A |
+| `VC2 (+)` | the pair on RJ45 **4 & 5** | B |
+| `VC2 (-)` | the pair on RJ45 **7 & 8** | B |
+
+each "not polarity sensitive" and feeding the +/- of an input bridge rectifier.
+This is why `D_BR1`/`D_BR2` exist and why `POE_VIN_N` is not ground: neither the
+Alternative nor the polarity is known in advance. Our `POE_TAP_A1/A2` therefore
+take `VC1`/`VC2` and `POE_TAP_B1/B2` take `VC3`/`VC4`, as wired.
+
+The Bob Smith network (`4*22nF`, `4*75R`, `1000pF/2kV` to `SHIELD`) is internal to
+this connector - confirmed against the drawing - so no external termination or
+shield capacitor is fitted. The series 22 nF per tap is what stops the two
+pair-sets being DC-coupled through the common 75 R node, which is what makes the
+`VC` pins usable for PoE at all.
+
+
+**This is convergent evidence, not the part's own datasheet**, so it is not yet
+sufficient to wire 48 V. Two things remain unproven: the `CT`/`VC` split itself,
+and *which* `VC` belongs to *which* RJ45 pair — the latter matters because each
+bridge must see the two taps of one Alternative (A = pairs 1&2 and 3&6, B = pairs
+4&5 and 7&8). Mixing a pair-set across bridges is a wiring defect.
+
+**Ring-out procedure (decisive, needs one sample and an ohmmeter).** Each tap sits
+at the electrical centre of one transformer winding, so it reads a fraction of an
+ohm to *both* ends of that winding and open to the other side of the barrier:
+
+- a **cable-side** tap reads ≈0.5–2 Ω to both RJ45 contacts of its pair (e.g.
+  contacts 1 and 2) and open to that pair's `TD±` pins;
+- a **PHY-side** tap reads ≈0.5–2 Ω to both `TD+` and `TD−` of its pair and open
+  to the RJ45 contacts.
+
+The same measurement also yields the pair mapping, since it identifies which RJ45
+contacts each tap belongs to. Record the result here before the Ethernet sheet is
+drawn.
+
+**Safety rule regardless of outcome:** the PHY-side taps must never connect to the
+PoE feed. They sit on the isolated side referenced to board ground, and bridging
+them to the cable-side taps would short across the isolation barrier that M1
+provides — defeating the property that keeps 48 V off the instrument chassis
+through the IEEE-488 shell.
+
+One more property of this jack worth carrying forward: it is a 4-pair 2.5G part
+while the W5500 is 10/100. The extra pairs are harmless and in fact allow both
+Alternative A and B to be tapped, but the magnetics' open-circuit inductance
+should be checked against the W5500's requirement when §5.6 is entered.
+
 ---
+
+### 4.5 Silent-failure modes observed in KiCad 10 / Konnect (2026-09-22)
+
+Three defects in this session were invisible in the schematic editor's normal
+feedback and were caught only by an explicit check. Each is a class of mistake
+that produces a plausible-looking sheet and a wrong netlist, so each is recorded
+with the check that detects it.
+
+**1. Wires that miss sheet pins by a grid snap.** `import_sheet_pins` places
+pins at half-grid positions (x = 150.00, y = 42.54), while wire endpoints are
+snapped to the 1.27 mm grid. A wire drawn to a pin's exact coordinates therefore
+lands at (149.86, 41.91) and does not connect. Nothing complains: the wires are
+drawn, they simply conduct nothing, and the two sheets stay on separate nets with
+identical net names. Detected by `validate_wire_connections` (36 floating
+endpoints) and by two nets named `TE` in one exported netlist. Fixed by placing
+each sheet's origin on the 1.27 mm grid, which makes every pin grid-aligned
+because the pin offsets are multiples of 2.54 mm.
+
+**2. Sheet pins outside the sheet outline are silently merged.** `import_sheet_pins`
+stacks new pins below the existing ones without growing the sheet box. Six SPI
+pins imported onto a 55 mm-tall block put the last three at y = 176.53, 179.07
+and 181.61 against a bottom edge at 175.65. KiCad's netlister collapsed all
+three into one net: `ETH_MOSI` and `ETH_RSTn` disappeared and `ETH_INTn` carried
+GPIO19, GPIO20 and GPIO21 together — three SPI signals shorted. Konnect's own
+connectivity model disagreed with KiCad throughout, reporting the three nets as
+correctly separate, so the schematic *looked* right from inside the tool that
+drew it. Detected by the netlist gate. Fixed by enlarging the sheet block to
+contain every pin. **Check pin extents against the block after every
+`import_sheet_pins` call.**
+
+**3. Duplicate `#PWR` designators across sheets.** `add_power_symbol` numbers
+`#PWR` references per sheet, so a power symbol added to a second sheet reuses
+`#PWR001`. The only symptom is `kicad-cli`'s generic "schematic has annotation
+errors" warning on the *root* export; each sheet exports cleanly on its own, ERC
+reports nothing, and `annotate_schematic` reports zero unannotated symbols
+because it does not detect duplicates spread across sheets. Ruled out before
+finding it: unannotated instances, reference-prefix mismatches (confirmed
+irrelevant by aligning every prefix on a scratch copy — the warning persisted),
+and malformed instance paths (the `/<root-uuid>/<sheet-uuid>` form is correct).
+Located by bisection: removing either of two sheets cleared the warning, which
+is the signature of a duplicate pair. Detect with a cross-sheet scan of
+`(reference "...")` outside the `lib_symbols` block; renumber the later sheet's
+symbols.
 
 ## 5. Net list
 
@@ -340,8 +636,19 @@ IEEE-488 J1 (Amphenol-57 numbering): 1-4 DIO1-4, 5 EOI, 6 DAV, 7 NRFD, 8 NDAC,
 Enter per RP "Hardware design with RP2350" / RP2350A Minimal, **omitting the flash
 and R10** (RP2354 internal flash). Key nets:
 
-- **Core SMPS:** `U1.VREG_VIN`→+3V3; `U1.VREG_LX`→`L1`→`+3V3`(core node) with `C7`
-  4.7 µF; `U1.VREG_PGND`→GND. L1 orientation per RP guidance.
+- **Core SMPS:** `U1.VREG_VIN`→+3V3; `U1.VREG_LX`→`L1` 3.3 µH→**`DVDD`** (the
+  ≈1.1 V core rail, pins 6/23/39) with `C7` 4.7 µF on DVDD; `U1.VREG_FB`→`DVDD`
+  as the sense node; `U1.VREG_PGND`→GND; `U1.VREG_AVDD`→+3V3. L1 orientation per
+  RP guidance (the magnetic field couples into C7 if it is fitted the wrong way
+  round — "Hardware design with RP2350" §2.5).
+
+  **Corrected 2026-09-21.** Earlier revisions of this line read
+  "`VREG_LX`→`L1`→`+3V3` (core node)", which is wrong and destructive: it would
+  tie the 3.3 V rail through the inductor to the DVDD pins and feed the ≈1.1 V
+  core from 3.3 V. Raspberry Pi's "Hardware design with RP2350" is explicit that
+  the regulator produces "a 1.1 V output to supply the DVDD on the chip", with
+  L1 and C7 as its output filter and VREG_FB monitoring that output. DVDD is its
+  own net and must never be joined to +3V3.
 - **Clock:** `X1` 12 MHz between `U1.XIN`/`U1.XOUT`, `C_X1a/b` 15 pF to GND.
 - **Decoupling:** 100 nF (`C_MCU`) at every IOVDD/DVDD pin; bulk per minimal.
 - **USB:** `U1.USB_DP`/`U1.USB_DM` → `J3` D+/D−.
@@ -350,7 +657,56 @@ and R10** (RP2354 internal flash). Key nets:
 - **Status LED:** `LED1` + `R_LED` on a spare GPIO (e.g. GPIO25); GPIO recorded in
   the board package (`R-HW-064`).
 - **SPI to W5500:** GPIO16 MISO, GPIO17 CSn, GPIO18 SCK, GPIO19 MOSI, GPIO20 W5500-RST,
-  GPIO21 W5500-INT.
+  GPIO21 W5500-INT. Carried off-sheet as hierarchical labels `ETH_MISO`, `ETH_CSn`,
+  `ETH_SCK`, `ETH_MOSI`, `ETH_RSTn`, `ETH_INTn` (per the globals-for-rails,
+  hierarchical-for-signals rule).
+- **SWD debug (added 2026-09-22, not in revision 2).** `U1.SWCLK` and `U1.SWDIO`
+  are brought out to test pads `TP_SWCLK1`/`TP_SWDIO1`. The revision-2 net table
+  was silent on debug access; a first prototype with no way to attach a probe is
+  a false economy, and two pads cost nothing. The alternative — declaring both
+  pins `!nc` — was rejected for that reason. Not an SWD header: this is a plug-in
+  dongle and the height budget is set by the Centronics connector.
+- **USB-C role:** `R_CC1`/`R_CC2` 5k1 from `J3.CC1`/`J3.CC2` to GND (upstream
+  facing port / device role). Both `DP1`/`DP2` are tied to `USB_DP` and both
+  `DN1`/`DN2` to `USB_DM` so the cable works either way up.
+
+  **`VBUS` is a declared non-connection.** Both VBUS contacts carry `!nc`. The
+  board is powered from PoE only; bridging VBUS to `+5V_POE` or `+3V3` would
+  backfeed the PoE supply from a host, or the host from the PSE, in violation of
+  design-spec §30.1. Bench-powering over USB is deliberately not supported.
+
+
+**Analogue rail and magnetics, added 2026-09-22 from the WIZnet W5500-EVB-Pico2
+reference (SCH-W5500-EVB-Pico2-V100, rev 1.0, 2024-08-01).** The W5500 datasheet
+carries no application schematic - 27 figures, none showing the magnetics bias -
+so the following is taken from WIZnet's own board, which pairs a W5500 with an
+RP2350 and is therefore the same architecture as this design:
+
+- **Separate filtered analogue rail.** `+3V3` feeds ferrite `L2` to make `3V3A`;
+  every `AVDD` pin (4, 8, 11, 15, 17, 21) and the magnetics bias run from `3V3A`,
+  while `VDD` (28) stays on the unfiltered rail. `PWR_FLAG` marks `3V3A` as driven.
+- **Series resistors on the MDI pairs.** `R_TX1`/`R_TX2`/`R_RX1`/`R_RX2`, 3R3 each,
+  between the W5500 and the connector (`R15`-`R18` in the reference).
+- **Bias/termination.** `R_B1` 10R from `3V3A` to `ETH_BIAS`, decoupled by
+  `C_BIAS1` 100n, with `R_T1`-`R_T4` 49R9 from that node to each MDI pin
+  (`R28`, `C30`, `R19`-`R22`).
+- **Pull-ups the reference does not leave to the internal ones:** `R_RSTP1` 4k7 on
+  `ETH_RSTn` and `R_INTP1` 4k7 on `ETH_INTn` (`R12`, `R32`/`R33`).
+- **Crystal.** Loads corrected 22p -> **18p** to match the datasheet's stated 18 pF
+  load capacitance, plus `R_XF1` 1M feedback across the crystal (`R24`).
+- **PHY-side centre taps.** `ETH_TCT` (J2.12, the RJ45 1&2 pair) and `ETH_RCT`
+  (J2.6, the 3&6 pair) are AC-grounded through 22n, following `C28`. The taps of
+  the two pairs unused at 10/100 (J2.1, J2.7) are declared open.
+
+Deliberately **not** copied from the reference: its jack uses an *external* Bob
+Smith network (`C31` 1nF/2kV on the jack's GND pin) whereas ours has it internal,
+so no shield capacitor or 75 R network is fitted here.
+
+Independently confirmed by the reference, previously only inferred: the SPI GPIO
+map is identical (GPIO16 MISO, 17 CSn, 18 SCK, 19 MOSI, 20 RSTn, 21 INTn);
+`EXRES1` 12k4 1% to ground; `TOCAP` 4u7; `VBG` left floating; PMODE[2:0] strapped
+high; 25 MHz crystal; a status LED on GPIO25. The reference also brings SWD out on
+a 3-pin header, supporting the test-pad decision recorded in 5.5.
 
 ### 5.6 Ethernet + PoE block (U2 W5500, J2, M1) — build from W5500 reference
 
@@ -394,6 +750,18 @@ TP_SRQ→SRQ_B, TP_IFC→IFC_B, TP_5V→+5V_POE, TP_3V3→+3V3, TP_GND→GND`.
 | UART0 (GPIO0/1) | not a console | GPIO0/1 are DIO1/DIO2; diagnostics = USB CDC (`R-HW-063`) |
 
 ---
+
+**Added 2026-09-22, MCU sheet.** Each of these carries a no-connect flag on the
+schematic and a matching `!nc` line in `netlist-spec.nets`; the checker fails if a
+pin is left floating that nobody declared open.
+
+| Pin(s) | Reason |
+|---|---|
+| `U1.55`–`U1.60` (QSPI SD3/SCLK/SD0/SD2/SD1/SS) | RP2354A has 2 MB stacked internal flash; the QSPI bus is not brought out. This is the `R10`/external-flash omission of §5.5 made explicit. |
+| `U1.35`, `U1.36` (GPIO23, GPIO24) | Unused. The GPIO budget in §5.2 is fully assigned without them. |
+| `U1.43` (GPIO29/ADC3) | Unused; no analogue input in this design. |
+| `J3.A4B9`, `J3.B4A9` (VBUS ×2) | No PoE↔USB backfeed — see §5.5. |
+| `J3.B8`, `J3.A8` (SBU2, SBU1) | Sideband unused; USB 2.0 device only. |
 
 ## 7. Requirement traceability (`R-HW-010`..`R-HW-065`)
 

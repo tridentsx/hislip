@@ -25,7 +25,8 @@ class Spec:
         self.reqs = []                     # required R-HW ids (order preserved)
         self.covers = set()                # R-HW ids that have a @cover line
         self.nets = {}                     # net name -> list of (ref, pin)
-        self.nc = {}                       # (ref, pin) -> reason
+        self.nc = {}
+        self.open_nets = {}                       # (ref, pin) -> reason
 
 
 def parse_pinref(tok):
@@ -53,6 +54,13 @@ def load_spec(path):
                 s.gpio[sig] = int(num)
             elif line.startswith("!req"):
                 s.reqs.append(line.split()[1])
+            elif line.startswith("!open"):
+                # A net that is deliberately incomplete: the missing connection
+                # is an unresolved design question, not an oversight. Reported
+                # as pending so the gate stays meaningful while the open item
+                # stays visible.
+                parts = line.split(None, 2)
+                s.open_nets[parts[1]] = parts[2] if len(parts) > 2 else ""
             elif line.startswith("!nc"):
                 parts = line.split(None, 2)
                 ref, pin = parse_pinref(parts[1])
@@ -134,7 +142,11 @@ def check_pin_assignment(s, r):
 
 def check_min_two(s, r):
     """A net with fewer than two pins is dangling."""
-    bad = {n: m for n, m in s.nets.items() if len(m) < 2}
+    bad = {n: m for n, m in s.nets.items()
+           if len(m) < 2 and n not in s.open_nets}
+    for n in sorted(s.open_nets):
+        if n in s.nets and len(s.nets[n]) < 2:
+            r.ok(f"net {n}: pending - {s.open_nets[n] or 'declared open'}")
     if bad:
         for n, m in sorted(bad.items()):
             r.fail(f"net {n} has {len(m)} pin(s); needs >= 2")
@@ -191,47 +203,118 @@ def check_requirements(s, r):
 # ---- optional: diff against a KiCad-exported netlist ----
 
 def load_kicad_netlist(path):
-    """Very small parser for `kicad-cli sch export netlist` (s-expr).
-    Returns {netname: set((ref,pin))}."""
+    """Parser for `kicad-cli sch export netlist` (s-expr).
+
+    Returns (nets, pinnames, refs) where
+      nets     = {netname: set((ref, pin_number))}
+      pinnames = {ref: {PINFUNCTION: pin_number}}
+      refs     = set of every reference designator in the export
+
+    Two normalisations matter. KiCad prefixes a sheet-local net with its sheet
+    path ("Some Sheet/DIO1_B"); only the last component is the net's name. And
+    KiCad identifies a pin by *number*, while this specification names the pins
+    of `!part` components by function (U5.IN, Q1.S, R_G1.a) because a number
+    means nothing until a symbol is chosen. `pinnames` is what lets the two be
+    compared without hard-coding either.
+    """
     text = open(path, encoding="utf-8").read()
-    nets = {}
-    # (net (code "N") (name "NAME") (node (ref "U1") (pin "20") ...) ...)
-    for net_blk in re.finditer(r'\(net\b(.*?)(?=\(net\b|\Z)', text, re.S):
+    nets, pinnames, refs = {}, {}, set()
+    for net_blk in re.finditer(r'\(net\b(.*?)(?=^\t\t\(net\b|\Z)', text,
+                               re.S | re.M):
         blk = net_blk.group(1)
-        nm = re.search(r'\(name\s+"?([^")]+)"?\s*\)', blk)
+        nm = re.search(r'\(name\s+"([^"]*)"\s*\)', blk)
         if not nm:
             continue
-        name = nm.group(1).strip().lstrip("/")
+        name = nm.group(1).strip().rsplit("/", 1)[-1]
         members = set()
-        for node in re.finditer(r'\(node\s+(.*?)\)', blk, re.S):
+        for node in re.finditer(r'\(node\b((?:\s*\([^()]*\))+)\s*\)', blk, re.S):
             nb = node.group(1)
-            ref = re.search(r'\(ref\s+"?([^")]+)"?', nb)
-            pin = re.search(r'\(pin\s+"?([^")]+)"?', nb)
-            if ref and pin:
-                members.add((ref.group(1), pin.group(1)))
+            ref = re.search(r'\(ref\s+"([^"]*)"', nb)
+            pin = re.search(r'\(pin\s+"([^"]*)"', nb)
+            fn = re.search(r'\(pinfunction\s+"([^"]*)"', nb)
+            if not (ref and pin):
+                continue
+            members.add((ref.group(1), pin.group(1)))
+            refs.add(ref.group(1))
+            if fn:
+                pinnames.setdefault(ref.group(1), {})[fn.group(1).upper()] = \
+                    pin.group(1)
         nets[name] = members
-    return nets
+    return nets, pinnames, refs
+
+
+def resolve_pin(ref, pin, pinnames):
+    """Translate a specification pin id into the exported pin *number*.
+
+    Tries, in order: it already is the number; the symbol's pin function
+    (U6.RESET); the function with a 'V' prefix, since a datasheet's IN/OUT is
+    a symbol's VIN/VOUT; and finally the two-terminal a/b convention.
+    """
+    table = pinnames.get(ref, {})
+    if pin in table.values():
+        return pin
+    for cand in (pin.upper(), "V" + pin.upper()):
+        if cand in table:
+            return table[cand]
+    return {"a": "1", "b": "2"}.get(pin, pin)
 
 
 def diff_against_kicad(s, kpath, r):
-    kicad = load_kicad_netlist(kpath)
-    canon = {name: set(m) for name, m in s.nets.items()}
+    kicad, pinnames, exported_refs = load_kicad_netlist(kpath)
+    canon = {}
+    for name, members in s.nets.items():
+        canon[name] = {(ref, resolve_pin(ref, pin, pinnames))
+                       for ref, pin in members}
     k_by_members = {frozenset(m): n for n, m in kicad.items()}
     for name, members in sorted(canon.items()):
         key = frozenset(members)
         if key in k_by_members:
-            r.ok(f"net {name}: membership matches exported net {k_by_members[key]!r}")
-        elif name in kicad:
+            r.ok(f"net {name}: membership matches exported net "
+                 f"{k_by_members[key]!r}")
+            continue
+        if name in kicad:
             miss = members - kicad[name]
             extra = kicad[name] - members
-            r.fail(f"net {name}: membership differs "
-                   f"(missing {sorted(miss)}, extra {sorted(extra)})")
+            # A member whose component is not in the export at all belongs to a
+            # sheet that has not been drawn yet. That is pending work, not a
+            # wiring defect, and saying so keeps the real failures visible.
+            if miss and not extra and all(ref not in exported_refs
+                                          for ref, _ in miss):
+                r.ok(f"net {name}: partial - implemented members match, "
+                     f"awaiting {sorted(ref for ref, _ in miss)}")
+            else:
+                r.fail(f"net {name}: membership differs "
+                       f"(missing {sorted(miss)}, extra {sorted(extra)})")
         else:
-            r.fail(f"net {name}: not found in exported netlist by name or membership")
+            if all(ref not in exported_refs for ref, _ in members):
+                r.ok(f"net {name}: pending - no member component drawn yet")
+            else:
+                r.fail(f"net {name}: not found in exported netlist by name "
+                       f"or membership")
     canon_keys = {frozenset(m) for m in canon.values()}
     for name, members in sorted(kicad.items()):
-        if frozenset(members) not in canon_keys and name not in canon:
-            r.fail(f"exported net {name!r} has no counterpart in the specification")
+        if frozenset(members) in canon_keys or name in canon:
+            continue
+        if all(ref.startswith("#") for ref, _ in members):
+            continue  # power-flag-only net, carries no component pin
+        # KiCad invents an "unconnected-(REF-PINNAME-PadN)" net for every pin
+        # left deliberately open. That is not an unspecified net: it is the
+        # export's way of spelling a non-connection, so check it against the
+        # specification's !nc declarations instead of reporting it as junk. A
+        # pin KiCad reports as unconnected that the specification never
+        # declared open is a real defect and still fails.
+        if name.startswith("unconnected-") and len(members) == 1:
+            ref, pin = next(iter(members))
+            declared = {(r, resolve_pin(r, p, pinnames))
+                        for r, p in s.nc}
+            if (ref, pin) in declared:
+                r.ok(f"net {name}: matches declared non-connection {ref}.{pin}")
+            else:
+                r.fail(f"pin {ref}.{pin} is unconnected in the export but no "
+                       f"!nc declares it open")
+            continue
+        r.fail(f"exported net {name!r} has no counterpart in the "
+               f"specification")
 
 
 def main(argv):

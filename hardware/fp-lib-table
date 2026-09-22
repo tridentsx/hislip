@@ -1,0 +1,5 @@
+(fp_lib_table
+  (version 7)
+
+  (lib (name "adapter") (type "KiCad") (uri "${KIPRJMOD}/lib/adapter.pretty") (options "") (descr ""))
+  (lib (name "Connector_GPIB") (type "KiCad") (uri "${KIPRJMOD}/lib/third-party/gpib-kicad-library/footprints/Connector_GPIB.pretty") (options "") (descr "")))

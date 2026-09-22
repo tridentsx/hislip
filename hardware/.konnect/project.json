@@ -1,0 +1,13 @@
+{
+  "default_passives": {
+    "decoupling_cap": "100nF X7R 0805"
+  },
+  "design_rules": [
+    "The transceiver rail +5V_XCVR must only ever be fed through the Q1 P-FET high-side gate driven by the U6 3V3-good supervisor via Q2 (net PG_3V3). Never connect U3/U4 VCC (pin 20) directly to +5V_POE: the RP2354 fault-tolerant pads tolerate 5.5V only while IOVDD is at 3.3V (R-HW-020, R-HW-044).",
+    "Every safe-state bias resistor must reference +3V3 or GND, never a 5V rail: R_TE to GND (TE=L); R_DC, R_ATN, R_REN, R_IFC, R_SRQ, R_CFG to +3V3. TE/DC land on GPIO26/27 which are NOT fault-tolerant, so a 5V pull-up there is a defect. The single deliberate exception is R_PE to +5V_XCVR (SN75160B 3-state select).",
+    "The RP2354A GPIO map is load-bearing for the PIO state machines and must not be reshuffled: GPIO0-7 = DIO1-8 contiguous with DIO1 lowest (R-HW-060); GPIO8/9/10/11 = ATN/SRQ/REN/IFC; GPIO12/13/14/15 = EOI/DAV/NDAC/NRFD consecutive for one PIO SM (R-HW-061); GPIO16-21 = W5500 SPI MISO/CSn/SCK/MOSI/RST/INT; GPIO22 spare test pad; GPIO26 = TE; GPIO27 = DC; GPIO28 = CFG."
+  ],
+  "fab_constraints": {},
+  "naming_conventions": {},
+  "sourcing": {}
+}
