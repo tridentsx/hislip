@@ -1063,7 +1063,7 @@
     )
     (property
       "Footprint"
-      "adapter:SOIC-20_L13.0-W7.6-P1.27-LS10.3-BL"
+      "Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm"
       (id 2)
       (at 0 -19.05 0)
       (effects (font (size 1.27 1.27) ) hide)
@@ -1911,6 +1911,18 @@
         (length 2.54)
         (name "EH" (effects (font (size 1.27 1.27))))
         (number "22" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at 12.70 -26.67 180)
+        (length 2.54)
+        (name "S1" (effects (font (size 1.27 1.27))))
+        (number "S1" (effects (font (size 1.27 1.27))))
+      )
+      (pin passive line
+        (at 12.70 -29.21 180)
+        (length 2.54)
+        (name "S2" (effects (font (size 1.27 1.27))))
+        (number "S2" (effects (font (size 1.27 1.27))))
       )
     )
   )

@@ -1435,7 +1435,7 @@
 					)
 				)
 			)
-			(property "Footprint" "adapter:SOIC-20_L13.0-W7.6-P1.27-LS10.3-BL"
+			(property "Footprint" "Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm"
 				(at 0 -19.05 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -3322,7 +3322,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 200.66 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -3401,7 +3401,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 62.23 96.52 0)
 			(hide yes)
 			(show_name no)
@@ -3791,7 +3791,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 254 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -3869,7 +3869,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 200.66 30.48 0)
 			(hide yes)
 			(show_name no)
@@ -3948,7 +3948,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 43.18 215.9 0)
 			(hide yes)
 			(show_name no)
@@ -4029,7 +4029,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 215.9 137.16 0)
 			(hide yes)
 			(show_name no)
@@ -4185,7 +4185,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 228.6 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -4261,7 +4261,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 62.23 86.36 0)
 			(hide yes)
 			(show_name no)
@@ -4339,7 +4339,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 215.9 30.48 0)
 			(hide yes)
 			(show_name no)
@@ -4418,7 +4418,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 340.36 149.86 0)
 			(hide yes)
 			(show_name no)
@@ -4497,7 +4497,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 292.1 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -4573,7 +4573,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 175.26 30.48 0)
 			(hide yes)
 			(show_name no)
@@ -4652,7 +4652,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 279.4 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -4728,7 +4728,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 77.47 86.36 0)
 			(hide yes)
 			(show_name no)
@@ -4804,7 +4804,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 266.7 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -4880,7 +4880,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 73.66 215.9 0)
 			(hide yes)
 			(show_name no)
@@ -4961,7 +4961,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 353.06 149.86 0)
 			(hide yes)
 			(show_name no)
@@ -5040,7 +5040,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 77.47 96.52 0)
 			(hide yes)
 			(show_name no)
@@ -5119,7 +5119,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 58.42 215.9 0)
 			(hide yes)
 			(show_name no)
@@ -5198,7 +5198,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
 			(at 88.9 215.9 0)
 			(hide yes)
 			(show_name no)
@@ -5354,7 +5354,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.5mm"
 			(at 241.3 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -5431,7 +5431,7 @@
 				)
 			)
 		)
-		(property "Footprint" "adapter:SOIC-20_L13.0-W7.6-P1.27-LS10.3-BL"
+		(property "Footprint" "Package_SO:SOIC-20W_7.5x12.8mm_P1.27mm"
 			(at 139.7 175.26 0)
 			(hide yes)
 			(show_name no)

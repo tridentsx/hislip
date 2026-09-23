@@ -104,3 +104,8 @@ hardware/lib/third-party/gpib-kicad-library/3dmodels/
 *.swp
 *~
 .DS_Store
+
+# Konnect writes a timestamped snapshot before it repairs a clobbered file.
+# Transient recovery material, not project state: the repaired files themselves
+# are tracked, so a backup of the broken version has no value in history.
+_restore_backup_*/
