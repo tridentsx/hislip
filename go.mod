@@ -1,3 +1,3 @@
-module github.com/gotmc/hislip
+module github.com/tridentsx/hislip
 
 go 1.25.0

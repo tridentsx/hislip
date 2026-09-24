@@ -1,11 +1,11 @@
 // Copyright (c) 2026 The hislip developers. All rights reserved.
-// Project site: https://github.com/gotmc/hislip
+// Project site: https://github.com/tridentsx/hislip
 // Use of this source code is governed by a MIT-style license that
 // can be found in the LICENSE.txt file for the project.
 
 package server
 
-import "github.com/gotmc/hislip/protocol"
+import "github.com/tridentsx/hislip/protocol"
 
 // Class is the dispatch class of an incoming client message, per §47.1 of the
 // design specification.

@@ -1,11 +1,11 @@
 // Copyright (c) 2026 The hislip developers. All rights reserved.
-// Project site: https://github.com/gotmc/hislip
+// Project site: https://github.com/tridentsx/hislip
 // Use of this source code is governed by a MIT-style license that
 // can be found in the LICENSE.txt file for the project.
 
 package server
 
-import "github.com/gotmc/hislip/protocol"
+import "github.com/tridentsx/hislip/protocol"
 
 // MessageWriter writes HiSLIP messages to one channel of a session.
 //

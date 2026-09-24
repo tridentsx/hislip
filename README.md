@@ -26,9 +26,14 @@ or not they agree with IVI-6.1.
 The design specification is [docs/design-spec.md](docs/design-spec.md). Section
 references in the source comments, such as "§5.1", refer to it.
 
-This repository is not yet part of the `gotmc` organisation. It is developed
-against the final module path, `github.com/gotmc/hislip`, so that no import
-rewriting is needed when the upstream repository exists.
+This repository lives at `github.com/tridentsx/hislip` for now, not yet part
+of the `gotmc` organisation. It was originally developed against the module
+path `github.com/gotmc/hislip` on the assumption that no upstream repository
+would need to exist yet — but a module's declared path has to match where
+it's actually fetched from for `go get` to work at all, so it's renamed here
+to the path it's really hosted at. The intent to offer this to `gotmc` once
+it's finished hasn't changed; that will mean one real import-path rewrite
+when/if it happens, not zero.
 
 ## Layout
 

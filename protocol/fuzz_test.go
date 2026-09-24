@@ -1,5 +1,5 @@
 // Copyright (c) 2026 The hislip developers. All rights reserved.
-// Project site: https://github.com/gotmc/hislip
+// Project site: https://github.com/tridentsx/hislip
 // Use of this source code is governed by a MIT-style license that
 // can be found in the LICENSE.txt file for the project.
 
@@ -11,7 +11,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/gotmc/hislip/internal/vectors"
+	"github.com/tridentsx/hislip/internal/vectors"
 )
 
 // seedCorpus adds the golden and malformed vectors to a fuzz target, so that

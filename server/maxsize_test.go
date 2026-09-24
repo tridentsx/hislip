@@ -1,5 +1,5 @@
 // Copyright (c) 2026 The hislip developers. All rights reserved.
-// Project site: https://github.com/gotmc/hislip
+// Project site: https://github.com/tridentsx/hislip
 // Use of this source code is governed by a MIT-style license that
 // can be found in the LICENSE.txt file for the project.
 
@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gotmc/hislip/internal/testdevice"
-	"github.com/gotmc/hislip/internal/teststream"
-	"github.com/gotmc/hislip/protocol"
-	"github.com/gotmc/hislip/server"
+	"github.com/tridentsx/hislip/internal/testdevice"
+	"github.com/tridentsx/hislip/internal/teststream"
+	"github.com/tridentsx/hislip/protocol"
+	"github.com/tridentsx/hislip/server"
 )
 
 // TestMaximumMessageSizeDirection is a regression test for a bug found by
