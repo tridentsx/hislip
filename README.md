@@ -23,8 +23,16 @@ Conformance is established against independent implementations rather than
 against this project's own two halves, which would agree with each other whether
 or not they agree with IVI-6.1.
 
-The design specification is [docs/design-spec.md](docs/design-spec.md). Section
-references in the source comments, such as "§5.1", refer to it.
+The design specification lives at
+[docs/design-spec.md in tridentsx/tmc-gateway][design-spec], since it is a
+single document covering this library (Part I), the PoE-to-GPIB adapter
+hardware (Part II), and its TinyGo firmware (Part III) together, plus
+milestones/acceptance-criteria/risk sections that cut across all three —
+splitting it would have broken that traceability. Section references in this
+repository's source comments, such as "§5.1", refer to it there. The hardware
+design and firmware themselves also moved to `tmc-gateway`, along with the
+KiCad netlist-verification tooling that supports them; this repository is now
+the library alone.
 
 This repository lives at `github.com/tridentsx/hislip` for now, not yet part
 of the `gotmc` organisation. It was originally developed against the module
@@ -146,5 +154,6 @@ server is released.
 
 MIT. See [LICENSE.txt](LICENSE.txt).
 
+[design-spec]: https://github.com/tridentsx/tmc-gateway/blob/main/docs/design-spec.md
 [gotmc]: https://github.com/gotmc
 [ivi61]: https://www.ivifoundation.org/downloads/Protocol%20Specifications/IVI-6.1_HiSLIP-2.0-2020-04-23.pdf
