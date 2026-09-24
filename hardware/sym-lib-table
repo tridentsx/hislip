@@ -2,4 +2,5 @@
   (version 7)
 
   (lib (name "adapter") (type "KiCad") (uri "${KIPRJMOD}/lib/adapter.kicad_sym") (options "") (descr ""))
-  (lib (name "Connector_GPIB") (type "KiCad") (uri "${KIPRJMOD}/lib/third-party/gpib-kicad-library/symbols/Connector_GPIB.kicad_sym") (options "") (descr "")))
+  (lib (name "Connector_GPIB") (type "KiCad") (uri "${KIPRJMOD}/lib/third-party/gpib-kicad-library/symbols/Connector_GPIB.kicad_sym") (options "") (descr ""))
+  (lib (name "hr871150") (type "KiCad") (uri "${KIPRJMOD}/lib/hr871150.kicad_sym") (options "") (descr "")))

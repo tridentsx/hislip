@@ -179,7 +179,7 @@ def check_bias_rail_discipline(s, r):
     """Safe-state bias must never reference a 5 V net (GPIO26/27 are non-FT;
     the FT-side pull-ups stay on +3V3 to avoid 5 V into the pad). See 3.2."""
     bias = {"R_TE", "R_DC", "R_ATN", "R_REN", "R_IFC", "R_SRQ"}
-    fivev = {"+5V_POE", "+5V_XCVR"}
+    fivev = {"+5V_POE", "+5V_SYS", "+5V_XCVR"}
     offenders = []
     for net in fivev:
         for ref, pin in s.nets.get(net, []):

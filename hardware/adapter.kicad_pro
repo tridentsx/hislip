@@ -140,7 +140,7 @@
       },
       "rules": {
         "max_error": 0.005,
-        "min_clearance": 0.0,
+        "min_clearance": 0.2,
         "min_connection": 0.0,
         "min_copper_edge_clearance": 0.5,
         "min_groove_width": 0.0,
@@ -496,7 +496,7 @@
       {
         "bus_width": 12,
         "clearance": 0.2,
-        "diff_pair_gap": 0.25,
+        "diff_pair_gap": 0.2,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
@@ -506,10 +506,67 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 2147483647,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.25,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.2,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "MDI",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2147483647,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.2,
         "tuning_profile": "",
         "via_diameter": 0.6,
         "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "POE",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2147483647,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.5,
+        "tuning_profile": "",
+        "via_diameter": 0.8,
+        "via_drill": 0.4,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Power",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2147483647,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.5,
+        "tuning_profile": "",
+        "via_diameter": 0.8,
+        "via_drill": 0.4,
         "wire_width": 6
       }
     ],
@@ -518,7 +575,88 @@
     },
     "net_colors": null,
     "netclass_assignments": null,
-    "netclass_patterns": []
+    "netclass_patterns": [
+      {
+        "netclass": "Power",
+        "pattern": "+3V3"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "+5V_XCVR"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "+5V_POE"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "/Ethernet W5500 and magjack/3V3A"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "/MCU RP2354A/DVDD"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "/MCU RP2354A/VREG_LX"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_TXP"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_TXP_W"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_TXN"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_TXN_W"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_RXP"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_RXP_W"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_RXN"
+      },
+      {
+        "netclass": "MDI",
+        "pattern": "/Ethernet W5500 and magjack/ETH_RXN_W"
+      },
+      {
+        "netclass": "POE",
+        "pattern": "/Ethernet W5500 and magjack/POE_TAP_A1"
+      },
+      {
+        "netclass": "POE",
+        "pattern": "/Ethernet W5500 and magjack/POE_TAP_A2"
+      },
+      {
+        "netclass": "POE",
+        "pattern": "/Ethernet W5500 and magjack/POE_TAP_B1"
+      },
+      {
+        "netclass": "POE",
+        "pattern": "/Ethernet W5500 and magjack/POE_TAP_B2"
+      },
+      {
+        "netclass": "POE",
+        "pattern": "/PoE power input/POE_VIN_P"
+      },
+      {
+        "netclass": "POE",
+        "pattern": "/PoE power input/POE_VIN_N"
+      }
+    ]
   },
   "pcbnew": {
     "last_paths": {

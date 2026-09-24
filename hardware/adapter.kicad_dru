@@ -1,0 +1,16 @@
+(version 1)
+
+# IEEE 802.3at requires 1500 Vrms isolation between the cable-side power
+# interface and the device circuitry. That is a surge / ground-potential
+# requirement, not a shock-hazard one: 57 V DC is below the 60 V ES1
+# threshold of IEC 62368-1. 1500 Vrms across a PCB gap needs ~2 mm.
+#
+# The POE class is the PRIMARY (cable) side only: POE_TAP_A1/A2/B1/B2 and
+# POE_VIN_P/N. Note +5V_POE is the DP9900's ISOLATED OUTPUT despite its
+# name and is deliberately NOT in this class.
+#
+# Scoped to POE-vs-non-POE so that normal spacing still applies between the
+# primary-side nets themselves.
+(rule "PoE isolation barrier"
+	(condition "A.NetClass == 'POE' && B.NetClass != 'POE'")
+	(constraint clearance (min 2mm)))
