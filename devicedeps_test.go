@@ -39,6 +39,7 @@ var deviceAllowlist = map[string]string{
 	"encoding/binary": "big-endian header fields; no reflection on fixed-width types",
 	"errors":          "sentinel errors and errors.Is",
 	"io":              "Reader, Writer and ReadFull for the Stream abstraction",
+	"slices":          "used in config.go/transaction.go; verified server links under tinygo build -target=pico2 (0.42.0) via cmd/tinygocheck -- not yet run on real RP2350 hardware",
 	"strconv":         "Version.String; diagnostic paths only, never the data path",
 	"sync":            "only where TinyGo behaviour has been verified on the target",
 	"time":            "deadlines and timeout categories",
@@ -164,8 +165,8 @@ func intraModule(imported string) (string, bool) {
 		return ".", true
 	}
 	prefix := modulePath + "/"
-	if strings.HasPrefix(imported, prefix) {
-		return strings.TrimPrefix(imported, prefix), true
+	if after, ok := strings.CutPrefix(imported, prefix); ok {
+		return after, true
 	}
 	return "", false
 }

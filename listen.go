@@ -95,14 +95,12 @@ func (l *Listener) Serve(ctx context.Context) error {
 		}
 
 		l.track(conn)
-		l.wg.Add(1)
-		go func() {
-			defer l.wg.Done()
+		l.wg.Go(func() {
 			defer l.untrack(conn)
 			if err := l.srv.Serve(ctx, conn); err != nil {
 				l.report(err)
 			}
-		}()
+		})
 	}
 }
 

@@ -123,7 +123,7 @@ func (d *instrument) Write(_ context.Context, p []byte, end bool) error {
 
 // execute runs a program message, appending any response.
 func (d *instrument) execute(program string) {
-	for _, cmd := range strings.Split(program, ";") {
+	for cmd := range strings.SplitSeq(program, ";") {
 		cmd = strings.TrimSpace(cmd)
 		if cmd == "" {
 			continue

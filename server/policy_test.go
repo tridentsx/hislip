@@ -25,10 +25,7 @@ func classify(msg string) Disposition {
 func classifyChunked(msg string, size int) Disposition {
 	p := NewSCPIQueryPolicy()
 	for i := 0; i < len(msg); i += size {
-		end := i + size
-		if end > len(msg) {
-			end = len(msg)
-		}
+		end := min(i+size, len(msg))
 		p.Feed([]byte(msg[i:end]))
 	}
 	return p.Disposition()
@@ -158,10 +155,7 @@ func TestSCPIQueryPolicyBinaryBlock(t *testing.T) {
 		p := NewSCPIQueryPolicy()
 		b := msg.Bytes()
 		for i := 0; i < len(b); i += size {
-			end := i + size
-			if end > len(b) {
-				end = len(b)
-			}
+			end := min(i+size, len(b))
 			p.Feed(b[i:end])
 		}
 		if got := p.Disposition(); got != NoResponseExpected {

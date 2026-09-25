@@ -151,7 +151,7 @@ func TestReaderBuffersDoNotAlias(t *testing.T) {
 	go r.run()
 	defer r.stop()
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		msg, ok := r.next()
 		if !ok {
 			t.Fatalf("message %d: channel closed early", i)

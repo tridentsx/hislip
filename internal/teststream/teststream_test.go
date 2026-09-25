@@ -139,13 +139,11 @@ func TestCannedUnread(t *testing.T) {
 func TestPipeRoundTrip(t *testing.T) {
 	a, b := Pipe()
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if _, err := a.Write([]byte("ping")); err != nil {
 			t.Errorf("Write() error = %v", err)
 		}
-	}()
+	})
 	buf := make([]byte, 4)
 	if _, err := io.ReadFull(b, buf); err != nil {
 		t.Fatalf("ReadFull() error = %v", err)

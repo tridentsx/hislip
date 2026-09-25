@@ -331,10 +331,10 @@ func TestConcurrentLockTraffic(t *testing.T) {
 	const clients = 8
 	done := make(chan struct{})
 
-	for i := 0; i < clients; i++ {
+	for i := range clients {
 		go func(id uint16) {
 			defer func() { done <- struct{}{} }()
-			for j := 0; j < 50; j++ {
+			for range 50 {
 				if m.TryRequest(id, "") == LockGranted {
 					m.Release(id)
 				}
@@ -343,7 +343,7 @@ func TestConcurrentLockTraffic(t *testing.T) {
 			}
 		}(uint16(i + 1))
 	}
-	for i := 0; i < clients; i++ {
+	for range clients {
 		<-done
 	}
 	if got := m.State(); got != Unlocked {

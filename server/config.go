@@ -7,6 +7,7 @@ package server
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/tridentsx/hislip/protocol"
 )
@@ -133,12 +134,7 @@ func (c Config) acceptsSubAddress(sub string) bool {
 	if sub == "" {
 		return true
 	}
-	for _, s := range c.SubAddresses {
-		if s == sub {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.SubAddresses, sub)
 }
 
 // preferOverlapBit returns the InitializeResponse control code advertising this

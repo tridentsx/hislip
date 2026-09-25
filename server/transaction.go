@@ -7,6 +7,7 @@ package server
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/tridentsx/hislip/protocol"
 )
@@ -126,11 +127,9 @@ func (t *Transaction) To(next TxState) error {
 	if t.state == TxClosed {
 		return ErrInvalidTransition
 	}
-	for _, allowed := range txTransitions[t.state] {
-		if allowed == next {
-			t.state = next
-			return nil
-		}
+	if slices.Contains(txTransitions[t.state], next) {
+		t.state = next
+		return nil
 	}
 	return ErrInvalidTransition
 }

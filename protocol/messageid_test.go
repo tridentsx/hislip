@@ -54,7 +54,7 @@ func TestMessageIDWrap(t *testing.T) {
 	// Walk the whole sequence from the initial value and confirm that the
 	// reserved NoMessageID value is never produced.
 	id := InitialMessageID
-	for i := 0; i < 1<<12; i++ {
+	for i := range 1 << 12 {
 		if id == NoMessageID {
 			t.Fatalf("sequence produced NoMessageID after %d steps", i)
 		}
@@ -78,7 +78,7 @@ func TestCounterLastBeforeFirstTake(t *testing.T) {
 
 func TestCounterReset(t *testing.T) {
 	c := NewCounter()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		c.Take()
 	}
 	c.Reset()

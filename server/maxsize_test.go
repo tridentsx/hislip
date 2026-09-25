@@ -131,7 +131,7 @@ func TestResponseHonoursLoweredMaximum(t *testing.T) {
 	// The client now lowers the maximum below the response size.
 	const lowered uint64 = 1024
 	var sizeBuf [8]byte
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		sizeBuf[i] = byte(lowered >> (8 * (7 - i)))
 	}
 	c.send(c.asyncConn, &c.asyncBuf, protocol.Header{

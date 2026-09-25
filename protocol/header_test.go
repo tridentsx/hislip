@@ -114,7 +114,7 @@ func TestInvalidHeaders(t *testing.T) {
 
 func TestEncodeRejectsShortBuffer(t *testing.T) {
 	h := header(loadHeaders(t)[0])
-	for n := 0; n < HeaderSize; n++ {
+	for n := range HeaderSize {
 		b := make([]byte, n)
 		if err := h.Encode(b); !errors.Is(err, ErrShortBuffer) {
 			t.Errorf("Encode(%d bytes) error = %v, want ErrShortBuffer", n, err)

@@ -43,10 +43,7 @@ func ReadPayload(
 	}
 	remaining := n
 	for remaining > 0 {
-		chunk := uint64(len(scratch))
-		if remaining < chunk {
-			chunk = remaining
-		}
+		chunk := min(remaining, uint64(len(scratch)))
 		if _, err := io.ReadFull(r, scratch[:chunk]); err != nil {
 			return err
 		}

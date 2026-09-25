@@ -38,7 +38,7 @@ func TestTriggerIsOrderedWithData(t *testing.T) {
 // an asynchronous-channel message, and every strictly ordered operation must be a
 // synchronous-channel message.
 func TestClassFollowsChannel(t *testing.T) {
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		typ := protocol.MessageType(i)
 		if !typ.Defined() {
 			continue

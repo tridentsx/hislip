@@ -112,7 +112,7 @@ func (s *Server) allocateSession(
 func (s *Server) allocateIDLocked() (uint16, bool) {
 	// Scan the whole 16-bit space at most once, so that a pathological pattern
 	// of session churn cannot loop forever.
-	for i := 0; i < 1<<16; i++ {
+	for range 1 << 16 {
 		id := s.nextID
 		s.nextID++
 		if s.nextID == 0 {

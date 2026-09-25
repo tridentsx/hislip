@@ -75,7 +75,7 @@ func newReader(stream Stream, channel protocol.Channel, limit uint64) *reader {
 		msgs:    make(chan message, 1),
 		done:    make(chan struct{}),
 	}
-	for i := 0; i < readAheadSlots; i++ {
+	for range readAheadSlots {
 		r.free <- make([]byte, limit)
 	}
 	return r

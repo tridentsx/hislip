@@ -225,10 +225,7 @@ func (p *SCPIQueryPolicy) Feed(chunk []byte) {
 
 		case scpiBlockData:
 			available := uint64(len(chunk) - i)
-			skip := p.remain
-			if skip > available {
-				skip = available
-			}
+			skip := min(p.remain, available)
 			i += int(skip)
 			p.remain -= skip
 			if p.remain == 0 {

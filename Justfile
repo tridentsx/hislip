@@ -69,9 +69,15 @@ deps:
   go test -run TestDeviceImportGraph -v .
 
 # Compile the device-side packages for the RP2350 target. Requires tinygo.
+#
+# tinygo build, unlike go build, refuses to type-check a bare library
+# package -- it insists on linking a real executable ("expected main
+# package to have name main"), which is why this builds cmd/tinygocheck
+# rather than ./protocol/... ./server/... directly; that was tried first
+# and does not work with tinygo 0.42.0.
 [group('device')]
 tinygo:
-  tinygo build -target=pico2 -o /dev/null ./protocol/... ./server/...
+  tinygo build -target=pico2 -o /tmp/hislip-tinygocheck.elf ./cmd/tinygocheck
 
 # List the outdated direct dependencies (slow to run).
 [group('dependencies')]

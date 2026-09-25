@@ -240,7 +240,7 @@ func TestSessionIDsAreUniqueAndNonZero(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 	seen := map[uint16]bool{}
-	for i := 0; i < 64; i++ {
+	for i := range 64 {
 		sess, _, err := srv.Initialize(initializeHeader(protocol.Version10, ""), "", nil)
 		if err != nil {
 			t.Fatalf("Initialize() %d error = %v", i, err)
@@ -410,7 +410,7 @@ func TestCloseAll(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 	var sessions []*Session
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		s, _, err := srv.Initialize(initializeHeader(protocol.Version10, ""), "", nil)
 		if err != nil {
 			t.Fatalf("Initialize() error = %v", err)

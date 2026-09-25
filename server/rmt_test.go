@@ -96,7 +96,7 @@ func TestRMTMismatchDoesNotCascade(t *testing.T) {
 	if got := r.ReceivedSyncMessage(false); got != InterruptedRMTMismatch {
 		t.Fatalf("first message: got %v, want InterruptedRMTMismatch", got)
 	}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if got := r.ReceivedSyncMessage(false); got != NotInterrupted {
 			t.Fatalf("message %d after the error: got %v, want NotInterrupted", i+2, got)
 		}
@@ -159,7 +159,7 @@ func TestRMTNormalQuerySequence(t *testing.T) {
 // responses, which must never declare an interrupted error however long it runs.
 func TestRMTCommandOnlySequence(t *testing.T) {
 	var r RMT
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		if got := r.ReceivedSyncMessage(false); got != NotInterrupted {
 			t.Fatalf("command %d: got %v, want NotInterrupted", i, got)
 		}

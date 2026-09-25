@@ -323,7 +323,7 @@ func TestServiceRequestCoalesces(t *testing.T) {
 	}
 
 	// Further events while one is outstanding coalesce.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if _, send := f.srv.ServiceRequest(f.sess, 0x41); send {
 			t.Errorf("service request %d was sent while one was outstanding", i+2)
 		}
